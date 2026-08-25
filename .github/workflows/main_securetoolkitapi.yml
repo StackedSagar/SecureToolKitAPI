@@ -1,8 +1,3 @@
-# Docs for the Azure Web Apps Deploy action:
-# https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure:
-# https://github.com/Azure/actions
-
 name: Build and deploy ASP.Net Core app to Azure Web App - securetoolkitapi
 
 on:
@@ -14,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
 
@@ -21,29 +17,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up .NET 10
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.x'
 
+      - name: Restore
+        run: dotnet restore ./SecureToolKitAPI/SecureToolKitAPI.csproj
+
       - name: Build
-        run: dotnet build --configuration Release
+        run: dotnet build ./SecureToolKitAPI/SecureToolKitAPI.csproj --configuration Release --no-restore
 
       - name: Run tests
         run: dotnet test --configuration Release --no-build
 
-      - name: Publish
-        run: dotnet publish --configuration Release --output ./myapp
+      - name: Publish API
+        run: dotnet publish ./SecureToolKitAPI/SecureToolKitAPI.csproj --configuration Release --no-build -o ${{ env.DOTNET_ROOT }}/myapp
 
-      - name: Upload artifact for deployment
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ./myapp
+          path: ${{ env.DOTNET_ROOT }}/myapp
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
+
     permissions:
       id-token: write
       contents: read
@@ -53,7 +53,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
-          path: ./myapp
 
       - name: Login to Azure
         uses: azure/login@v2
