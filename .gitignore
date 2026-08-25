@@ -1,0 +1,90 @@
+# .gitignore for SecureToolKitAPI (.NET 10 / ASP.NET Core)
+# Ignores build output, IDE caches and local user/secret files. Source, project
+# files and appsettings*.json (which hold only log levels and AllowedHosts) are kept.
+
+## Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+## .NET / MSBuild
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.binlog
+
+## Test results and coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coverguid
+coverage*.json
+coverage*.xml
+coverage*.info
+*.opencover.xml
+BenchmarkDotNet.Artifacts/
+
+## Visual Studio / Rider IDE caches and user settings
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+## Rider / MSBuild temp
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+
+## NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+.nuget/
+nuget.config.user
+
+## ASP.NET Core local secrets and environment overrides
+# The committed appsettings.json / appsettings.Development.json hold no secrets.
+# These patterns keep any machine-specific or secret-bearing variants out.
+secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+*.pubxml.user
+
+## Key material and certificates — must never be committed
+*.pem
+*.key
+*.pfx
+*.p12
+*.p7b
+*.p7c
+*.cer
+*.crt
+*.der
+*.snk
+id_rsa
+id_rsa.*
+id_ecdsa
+id_ecdsa.*
+id_ed25519
+id_ed25519.*
+*.ppk
+*.jks
+*.keystore
+
+## OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

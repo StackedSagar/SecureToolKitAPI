@@ -1,0 +1,194 @@
+@SecureToolKitAPI_HostAddress = http://localhost:5149
+
+### Health
+
+GET {{SecureToolKitAPI_HostAddress}}/health
+
+### Discover the supported methods
+
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/methods
+Accept: application/json
+
+###
+
+GET {{SecureToolKitAPI_HostAddress}}/api/encrypt/methods
+Accept: application/json
+
+###
+
+GET {{SecureToolKitAPI_HostAddress}}/api/signature/methods
+Accept: application/json
+
+### AES-GCM round trip: generate key, encrypt, decrypt.
+# The keys below are generated locally for manual testing only. Never paste a real key here.
+
+# @name generateAesKey
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/aes?keySize=256
+Accept: application/json
+
+###
+
+# @name encryptWithAes
+POST {{SecureToolKitAPI_HostAddress}}/api/encrypt/aes-gcm
+Content-Type: application/json
+
+{
+  "key": "{{generateAesKey.response.body.$.key}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/decrypt/aes-gcm
+Content-Type: application/json
+
+{
+  "key": "{{generateAesKey.response.body.$.key}}",
+  "encryptedMessage": "{{encryptWithAes.response.body.$.encryptedMessage}}"
+}
+
+### RSA-OAEP round trip: encrypt with the public key, decrypt with the private key.
+
+# @name generateRsaKeys
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/rsa?keySize=2048
+Accept: application/json
+
+###
+
+# @name encryptWithRsa
+POST {{SecureToolKitAPI_HostAddress}}/api/encrypt/rsa-oaep
+Content-Type: application/json
+
+{
+  "key": "{{generateRsaKeys.response.body.$.publicKey}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/decrypt/rsa-oaep
+Content-Type: application/json
+
+{
+  "key": "{{generateRsaKeys.response.body.$.privateKey}}",
+  "encryptedMessage": "{{encryptWithRsa.response.body.$.encryptedMessage}}"
+}
+
+### ECDH + AES-GCM hybrid round trip: encrypt with the recipient public key, decrypt with the private key.
+
+# @name generateEccHillmanKeys
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/EccHillman?keySize=256
+Accept: application/json
+
+###
+
+# @name encryptWithEccHillman
+POST {{SecureToolKitAPI_HostAddress}}/api/encrypt/ecc-hillman
+Content-Type: application/json
+
+{
+  "key": "{{generateEccHillmanKeys.response.body.$.publicKey}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/decrypt/ecc-hillman
+Content-Type: application/json
+
+{
+  "key": "{{generateEccHillmanKeys.response.body.$.privateKey}}",
+  "encryptedMessage": "{{encryptWithEccHillman.response.body.$.encryptedMessage}}"
+}
+
+### ECDSA sign and verify: sign with the private key, verify with the public key.
+
+# @name generateEccDssKeys
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/EccDss?keySize=256
+Accept: application/json
+
+###
+
+# @name signWithEccDss
+POST {{SecureToolKitAPI_HostAddress}}/api/signature/ecc-dss/sign
+Content-Type: application/json
+
+{
+  "key": "{{generateEccDssKeys.response.body.$.privateKey}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/signature/ecc-dss/verify
+Content-Type: application/json
+
+{
+  "key": "{{generateEccDssKeys.response.body.$.publicKey}}",
+  "message": "Hello World",
+  "signature": "{{signWithEccDss.response.body.$.signature}}"
+}
+
+### HMAC-SHA256 sign and verify: the same secret is used for both.
+
+# @name generateHmacSecret
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/hmac?keySize=256
+Accept: application/json
+
+###
+
+# @name signWithHmac
+POST {{SecureToolKitAPI_HostAddress}}/api/signature/hmac-sha256/sign
+Content-Type: application/json
+
+{
+  "key": "{{generateHmacSecret.response.body.$.key}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/signature/hmac-sha256/verify
+Content-Type: application/json
+
+{
+  "key": "{{generateHmacSecret.response.body.$.key}}",
+  "message": "Hello World",
+  "signature": "{{signWithHmac.response.body.$.signature}}"
+}
+
+### Method-agnostic key generation
+
+POST {{SecureToolKitAPI_HostAddress}}/api/keygen/random
+Content-Type: application/json
+
+{
+  "keySize": 512
+}
+
+### Rejected requests: expect 400 with a problem response and no cryptographic detail
+
+GET {{SecureToolKitAPI_HostAddress}}/api/keygen/aes?keySize=100
+Accept: application/json
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/encrypt/not-a-method
+Content-Type: application/json
+
+{
+  "key": "{{generateAesKey.response.body.$.key}}",
+  "message": "Hello World"
+}
+
+###
+
+POST {{SecureToolKitAPI_HostAddress}}/api/decrypt/aes-gcm
+Content-Type: application/json
+
+{
+  "key": "{{generateAesKey.response.body.$.key}}",
+  "encryptedMessage": "not-base64!!"
+}
+
+###

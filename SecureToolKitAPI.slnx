@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SecureToolKitAPI/SecureToolKitAPI.csproj" />
+  <Project Path="SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj" />
+</Solution>
