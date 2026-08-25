@@ -32,16 +32,23 @@ jobs:
         run: dotnet test --configuration Release --no-build --no-restore
 
       - name: Publish API
-        run: dotnet publish ./SecureToolKitAPI/SecureToolKitAPI.csproj --configuration Release --no-build --no-restore -o ${{ env.DOTNET_ROOT }}/myapp
+        run: dotnet publish ./SecureToolKitAPI/SecureToolKitAPI.csproj --configuration Release --no-build --no-restore -o ./publish
+
+      - name: Verify publish output
+        run: |
+          echo "Published files:"
+          ls -la ./publish
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: .net-app
-          path: ${{ env.DOTNET_ROOT }}/myapp
+          name: securetoolkitapi
+          path: ./publish
+
 
   deploy:
     runs-on: ubuntu-latest
+
     needs: build
 
     permissions:
@@ -52,7 +59,13 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: .net-app
+          name: securetoolkitapi
+          path: ./myapp
+
+      - name: Verify deployment package
+        run: |
+          echo "Deployment package:"
+          ls -la ./myapp
 
       - name: Login to Azure
         uses: azure/login@v2
