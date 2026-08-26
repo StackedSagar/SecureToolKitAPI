@@ -47,7 +47,7 @@ Dependency injection is composed in `Program.cs` as the single composition root,
 
 All failures become RFC 9457 `ProblemDetails` responses through `GlobalExceptionHandler`. A `CryptographicRequestException` carries text written deliberately for API consumers and becomes a `400` with `Invalid cryptographic request.` as the title and that text as the detail. Anything else is treated as a defect: it is logged server-side and returned as a bare `500` with no detail at all, so stack traces, platform cryptographic messages and key material cannot reach a caller.
 
-Nothing sensitive is ever logged. The entire API contains exactly two logging statements, both in the exception handler, and both record only the HTTP method and path — never the request body, never the rejection reason, never key material.
+Nothing sensitive is ever logged. The entire API contains three logging statements. Two are in the exception handler and record only the HTTP method and path — never the request body, never the rejection reason, never key material. The third records a fixed message when the password preset catalogue is listed, an endpoint that generates nothing and returns no secret, so it carries no caller data either.
 
 ## Endpoints
 
@@ -172,7 +172,7 @@ dotnet build SecureToolKitAPI.slnx
 dotnet test  SecureToolKitAPI.slnx
 ```
 
-The suite is 694 `[Fact]` and `[Theory]` methods across 33 files — 20 unit and 13 integration — and theories expand to a larger number of executed cases. Unit tests cover each algorithm and generator directly; integration tests drive the real HTTP surface through `WebApplicationFactory<Program>`, including the full generate-key → encrypt → decrypt → original-message round trip. Coverage is deliberately weighted toward failure: invalid keys, wrong key for the method, corrupted and tampered ciphertext, unsupported method names, malformed Base64, empty and oversized input, and confirmation that problem responses never contain key material or internal type names.
+The suite is 697 `[Fact]` and `[Theory]` methods across 34 files — 21 unit and 13 integration — and theories expand to a larger number of executed cases. Unit tests cover each algorithm and generator directly; integration tests drive the real HTTP surface through `WebApplicationFactory<Program>`, including the full generate-key → encrypt → decrypt → original-message round trip. Coverage is deliberately weighted toward failure: invalid keys, wrong key for the method, corrupted and tampered ciphertext, unsupported method names, malformed Base64, empty and oversized input, and confirmation that problem responses never contain key material or internal type names.
 
 Both the build and the full test suite pass on .NET 10.
 
