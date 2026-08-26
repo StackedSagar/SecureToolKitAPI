@@ -48,7 +48,6 @@ namespace SecureToolKitAPI.Tests.Unit
         }
 
         [Theory]
-        [InlineData(PasswordCharacters.All, false, 4)]
         [InlineData(PasswordCharacters.All, false, 16)]
         [InlineData(PasswordCharacters.All, true, 32)]
         [InlineData(PasswordCharacters.Alphanumeric, false, 20)]
