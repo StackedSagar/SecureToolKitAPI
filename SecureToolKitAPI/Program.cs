@@ -44,6 +44,14 @@ if (app.Environment.IsDevelopment())
 app.UseRouting();
 app.UseHttpsRedirection();
 app.UseAuthorization();
+app.MapGet("/configEnvironment", () =>
+{
+    return new
+    {
+        Environment = app.Environment.EnvironmentName,
+        ApplicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown"
+    };
+});
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/healthcheck");
 app.MapControllers();
