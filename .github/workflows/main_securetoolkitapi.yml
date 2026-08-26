@@ -4,21 +4,28 @@ on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
 env:
   DOTNET_VERSION: '10.x'
+
   API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
   TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
+
   PUBLISH_DIR: './myapp'
+
   AZURE_WEBAPP_NAME: 'securetoolkitapi'
+
   HEALTH_URL: 'https://securetoolkitapi-cna4bzadekchehg2.centralindia-01.azurewebsites.net/health'
+
 
 jobs:
 
   # ============================================================
-  # BUILD + TEST
+  # BUILD AND TEST
   # ============================================================
+
   build:
     name: Build and Test
     runs-on: ubuntu-latest
@@ -28,56 +35,148 @@ jobs:
 
     steps:
 
-      - name: Checkout
+      # --------------------------------------------------------
+      # Checkout
+      # --------------------------------------------------------
+
+      - name: Checkout source
         uses: actions/checkout@v4
+
+
+      # --------------------------------------------------------
+      # Setup .NET 10
+      # --------------------------------------------------------
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+
+      # --------------------------------------------------------
+      # Restore API
+      # --------------------------------------------------------
+
       - name: Restore API
-        run: dotnet restore "${{ env.API_PROJECT }}"
+        run: >
+          dotnet restore
+          "${{ env.API_PROJECT }}"
+
+
+      # --------------------------------------------------------
+      # Restore Tests
+      # --------------------------------------------------------
 
       - name: Restore Tests
-        run: dotnet restore "${{ env.TEST_PROJECT }}"
+        run: >
+          dotnet restore
+          "${{ env.TEST_PROJECT }}"
+
+
+      # --------------------------------------------------------
+      # Build API
+      # --------------------------------------------------------
 
       - name: Build API
-        run: dotnet build "${{ env.API_PROJECT }}" \
-          --configuration Release \
+        run: >
+          dotnet build
+          "${{ env.API_PROJECT }}"
+          --configuration Release
           --no-restore
+
+
+      # --------------------------------------------------------
+      # Build Tests
+      # --------------------------------------------------------
 
       - name: Build Tests
-        run: dotnet build "${{ env.TEST_PROJECT }}" \
-          --configuration Release \
+        run: >
+          dotnet build
+          "${{ env.TEST_PROJECT }}"
+          --configuration Release
           --no-restore
+
+
+      # --------------------------------------------------------
+      # Run Unit Tests
+      # --------------------------------------------------------
 
       - name: Run Tests
-        run: dotnet test "${{ env.TEST_PROJECT }}" \
-          --configuration Release \
-          --no-build \
+        run: >
+          dotnet test
+          "${{ env.TEST_PROJECT }}"
+          --configuration Release
+          --no-build
           --no-restore
 
+
+      # --------------------------------------------------------
+      # Publish ONLY the API
+      # --------------------------------------------------------
+
       - name: Publish API
-        run: dotnet publish "${{ env.API_PROJECT }}" \
-          --configuration Release \
-          --no-restore \
+        run: >
+          dotnet publish
+          "${{ env.API_PROJECT }}"
+          --configuration Release
+          --no-restore
           --output "${{ env.PUBLISH_DIR }}"
 
+
+      # --------------------------------------------------------
+      # Verify publish output
+      # --------------------------------------------------------
+
       - name: Verify publish output
+        shell: bash
         run: |
-          echo "=== Published files ==="
-          find "${{ env.PUBLISH_DIR }}" -maxdepth 1 -type f -printf '%f\n'
+          echo "========================================"
+          echo "Published files"
+          echo "========================================"
+
+          find "${{ env.PUBLISH_DIR }}" \
+            -maxdepth 1 \
+            -type f \
+            -printf '%f\n'
 
           echo ""
-          echo "=== Runtime config files ==="
-          find "${{ env.PUBLISH_DIR }}" -name "*.runtimeconfig.json"
+          echo "========================================"
+          echo "Runtime configuration files"
+          echo "========================================"
+
+          find "${{ env.PUBLISH_DIR }}" \
+            -name "*.runtimeconfig.json" \
+            -printf '%p\n'
 
           echo ""
-          echo "=== Checking API DLL ==="
-          test -f "${{ env.PUBLISH_DIR }}/SecureToolKitAPI.dll"
+          echo "========================================"
+          echo "Checking API DLL"
+          echo "========================================"
 
-          echo "API publish verified."
+          if [ ! -f "${{ env.PUBLISH_DIR }}/SecureToolKitAPI.dll" ]; then
+            echo "ERROR: SecureToolKitAPI.dll was not found."
+            exit 1
+          fi
+
+          echo "SecureToolKitAPI.dll found."
+
+          echo ""
+          echo "========================================"
+          echo "Checking test DLL is NOT published"
+          echo "========================================"
+
+          if [ -f "${{ env.PUBLISH_DIR }}/SecureToolKitAPI.Tests.dll" ]; then
+            echo "ERROR: Test DLL was published."
+            echo "The deployment package must contain API files only."
+            exit 1
+          fi
+
+          echo "Test DLL not found. Good."
+
+
+      # --------------------------------------------------------
+      # Upload deployment artifact
+      # --------------------------------------------------------
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
@@ -88,11 +187,13 @@ jobs:
 
 
   # ============================================================
-  # DEPLOY
+  # DEPLOY TO AZURE
   # ============================================================
+
   deploy:
     name: Deploy to Azure
     runs-on: ubuntu-latest
+
     needs: build
 
     permissions:
@@ -101,22 +202,55 @@ jobs:
 
     steps:
 
+      # --------------------------------------------------------
+      # Download deployment artifact
+      # --------------------------------------------------------
+
       - name: Download deployment artifact
         uses: actions/download-artifact@v4
         with:
           name: securetoolkit-api
           path: ./myapp
 
+
+      # --------------------------------------------------------
+      # Verify downloaded artifact
+      # --------------------------------------------------------
+
       - name: Verify deployment artifact
+        shell: bash
         run: |
-          echo "=== Deployment files ==="
-          find ./myapp -maxdepth 1 -type f -printf '%f\n'
+          echo "========================================"
+          echo "Deployment files"
+          echo "========================================"
+
+          find ./myapp \
+            -maxdepth 1 \
+            -type f \
+            -printf '%f\n'
 
           echo ""
-          echo "=== Runtime config files ==="
-          find ./myapp -name "*.runtimeconfig.json"
+          echo "========================================"
+          echo "Runtime configuration files"
+          echo "========================================"
 
-          test -f ./myapp/SecureToolKitAPI.dll
+          find ./myapp \
+            -name "*.runtimeconfig.json" \
+            -printf '%p\n'
+
+          echo ""
+
+          if [ ! -f "./myapp/SecureToolKitAPI.dll" ]; then
+            echo "ERROR: SecureToolKitAPI.dll not found."
+            exit 1
+          fi
+
+          echo "SecureToolKitAPI.dll found."
+
+
+      # --------------------------------------------------------
+      # Login to Azure using OIDC
+      # --------------------------------------------------------
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -125,29 +259,52 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy API
+
+      # --------------------------------------------------------
+      # Deploy API
+      # --------------------------------------------------------
+
+      - name: Deploy API to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           slot-name: Production
           package: ./myapp
 
+
       # --------------------------------------------------------
-      # HEALTH CHECK
+      # Wait for App Service
       # --------------------------------------------------------
+
       - name: Wait for Azure App Service
+        shell: bash
         run: |
           echo "Waiting for Azure App Service to start..."
+
           sleep 30
 
+
+      # --------------------------------------------------------
+      # Health verification
+      # --------------------------------------------------------
+
       - name: Verify API health
+        shell: bash
         run: |
-          echo "Checking:"
+          echo "========================================"
+          echo "Azure API Health Check"
+          echo "========================================"
+
+          echo "URL:"
           echo "${{ env.HEALTH_URL }}"
 
+          echo ""
+
           for i in {1..10}; do
-            echo ""
-            echo "Health check attempt $i/10..."
+
+            echo "----------------------------------------"
+            echo "Health check attempt $i/10"
+            echo "----------------------------------------"
 
             HTTP_STATUS=$(curl \
               --silent \
@@ -159,19 +316,35 @@ jobs:
 
             echo "HTTP Status: $HTTP_STATUS"
 
+            echo ""
             echo "Response:"
+
             cat /tmp/health-response.txt || true
 
+            echo ""
+
             if [ "$HTTP_STATUS" = "200" ]; then
-              echo ""
-              echo "✅ API is healthy."
+              echo "========================================"
+              echo "SUCCESS"
+              echo "========================================"
+
+              echo "API is healthy."
+
               exit 0
             fi
 
             echo "API is not ready yet."
+            echo "Waiting 15 seconds..."
+
             sleep 15
+
           done
 
           echo ""
-          echo "❌ API health check failed."
+          echo "========================================"
+          echo "HEALTH CHECK FAILED"
+          echo "========================================"
+
+          echo "The API did not return HTTP 200 after 10 attempts."
+
           exit 1
