@@ -211,7 +211,7 @@ namespace SecureToolKitAPI.Tests.Unit
                     Length = BackupCodeSpec.MaximumLength
                 });
 
-            Assert.Equal(BackupCodeSpec.MinimumCount, smallest.Codes.Count);
+            Assert.Single(smallest.Codes);
             Assert.Equal(BackupCodeSpec.MinimumLength, smallest.Length);
             Assert.Equal(BackupCodeSpec.MaximumCount, largest.Codes.Count);
             Assert.Equal(BackupCodeSpec.MaximumLength, largest.Length);

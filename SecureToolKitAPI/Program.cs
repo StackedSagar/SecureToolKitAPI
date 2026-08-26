@@ -2,6 +2,9 @@ using SecureToolKitAPI.Application;
 using SecureToolKitAPI.ExceptionHandling;
 
 var builder = WebApplication.CreateBuilder(args);
+// Read from appsettings.json
+var environmentNameFromConfig = builder.Configuration["EnvironmentName"];
+
 builder.Host.UseDefaultServiceProvider(options =>
 {
     options.ValidateScopes = true;  // Reject captive dependencies: a singleton capturing a scoped service.
@@ -49,7 +52,8 @@ app.MapGet("/configEnvironment", () =>
     return new
     {
         Environment = app.Environment.EnvironmentName,
-        ApplicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown"
+        EnvironmentName = environmentNameFromConfig ?? string.Empty,
+        ApplicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty
     };
 });
 app.MapHealthChecks("/health");
