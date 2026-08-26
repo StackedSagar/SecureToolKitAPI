@@ -8,7 +8,9 @@ on:
 
 env:
   DOTNET_VERSION: '10.x'
-  PROJECT_PATH: './SecureToolKitAPI/SecureToolKitAPI.csproj'
+  SOLUTION_PATH: './SecureToolKitAPI.sln'
+  API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
+  TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
   PUBLISH_PATH: './myapp'
 
 jobs:
@@ -27,17 +29,20 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+      - name: Restore solution
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
-      - name: Build
-        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+      - name: Build solution
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test ./SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj --configuration Release --no-restore
+      - name: Run tests
+        run: dotnet test ${{ env.TEST_PROJECT }} --configuration Release --no-build --no-restore
 
       - name: Publish API
-        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-restore --output ${{ env.PUBLISH_PATH }}
+        run: dotnet publish ${{ env.API_PROJECT }} \
+          --configuration Release \
+          --no-restore \
+          --output ${{ env.PUBLISH_PATH }}
 
       - name: Verify published files
         run: |
