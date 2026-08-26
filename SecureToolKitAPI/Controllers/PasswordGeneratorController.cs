@@ -25,7 +25,7 @@ namespace SecureToolKitAPI.Controllers
     [ApiController]
     [Route("api/password")]
     [Produces("application/json")]
-    public class PasswordGeneratorController(IPasswordGenerator passwords) : ControllerBase
+    public class PasswordGeneratorController(IPasswordGenerator passwords, ILogger<PasswordGeneratorController> logger) : ControllerBase
     {
         /// <summary>
         /// Generates a random password.
@@ -228,8 +228,10 @@ namespace SecureToolKitAPI.Controllers
         /// <returns>Returns one entry per preset. No password is generated, so this response holds no secret.</returns>
         [HttpGet("presets")]
         [ProducesResponseType<IEnumerable<PasswordPresetResponse>>(StatusCodes.Status200OK)]
-        public IActionResult GetPresets() =>
-            Ok(PasswordPresetCatalog.All.Select(preset => new PasswordPresetResponse
+        public IActionResult GetPresets()
+        {
+            logger.LogInformation("Listing password presets");
+            return Ok(PasswordPresetCatalog.All.Select(preset => new PasswordPresetResponse
             {
                 Name = preset.Name,
                 Description = preset.Description,
@@ -237,6 +239,7 @@ namespace SecureToolKitAPI.Controllers
                 Composition = preset.Spec.Describe(),
                 Warnings = preset.Warnings
             }));
+        }
 
         /// <summary>
         /// Generates a password from a named preset.

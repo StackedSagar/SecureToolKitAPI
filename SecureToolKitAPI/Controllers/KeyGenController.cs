@@ -1,4 +1,3 @@
-using SecureToolKitAPI.Application;
 using SecureToolKitAPI.Application.Abstractions;
 using SecureToolKitAPI.Contracts.KeyGeneration;
 using SecureToolKitAPI.Contracts.Methods;
