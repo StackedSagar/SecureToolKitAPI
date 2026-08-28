@@ -1,9 +1,16 @@
+using Azure.Identity;
 using SecureToolKitAPI.Application;
 using SecureToolKitAPI.ExceptionHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 // Read from appsettings.json
 var environmentNameFromConfig = builder.Configuration["EnvironmentName"];
+
+var keyVaultUri = builder.Configuration["KeyVaultUri"];
+if (!string.IsNullOrWhiteSpace(keyVaultUri))
+{
+    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+}
 
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -47,7 +54,7 @@ if (app.Environment.IsDevelopment())
 app.UseRouting();
 app.UseHttpsRedirection();
 app.UseAuthorization();
-app.MapGet("/configEnvironment", () =>
+app.MapGet("/ConfigEnvironment", () =>
 {
     return new
     {
@@ -56,6 +63,18 @@ app.MapGet("/configEnvironment", () =>
         ApplicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty
     };
 });
+
+app.MapGet("/KeyVaultTest", (IConfiguration configuration) =>
+{
+    var value = configuration["LearningSecret"];
+
+    return Results.Ok(new
+    {
+        Source = "Azure Key Vault",
+        Value = value
+    });
+});
+
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/healthcheck");
 app.MapControllers();
