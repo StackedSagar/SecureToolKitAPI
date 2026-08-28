@@ -12,12 +12,13 @@ namespace SecureToolKitAPI.Tests.Integration
     /// exercise the same pipeline a caller would reach.
     /// </summary>
     /// <remarks>
-    /// The development environment is selected so the generated OpenAPI document is served and can be checked.
+    /// The testing environment prevents external services from being contacted while the generated OpenAPI
+    /// document remains available for the integration tests.
     /// </remarks>
     public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         /// <inheritdoc />
-        protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");
+        protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Testing");
     }
 
     /// <summary>Shares one hosted API across the integration test classes instead of starting one per class.</summary>

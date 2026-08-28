@@ -45,7 +45,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 var app = builder.Build();
 app.UseExceptionHandler(); // Configure the HTTP request pipeline.
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
