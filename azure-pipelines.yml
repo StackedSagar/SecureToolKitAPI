@@ -2,6 +2,9 @@
 # Start with a minimal pipeline that you can customize to build and deploy your code.
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
+# Starter pipeline
+# Build, test, collect coverage, and enforce a coverage quality gate.
+
 trigger:
 - main
 
@@ -13,21 +16,25 @@ variables:
   TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
   TEST_RESULTS: '$(Agent.TempDirectory)/TestResults'
 
+  # Minimum line coverage required.
+  # Change to 100 if you require 100% coverage.
+  MIN_LINE_COVERAGE: '80'
+
 steps:
 
-# --------------------------------------------------
+# ==================================================
 # Install .NET 10
-# --------------------------------------------------
+# ==================================================
 - task: UseDotNet@2
   displayName: 'Install .NET 10'
   inputs:
     packageType: 'sdk'
-    version: '10.0.400'
+    version: '10.x'
 
 
-# --------------------------------------------------
-# Verify .NET + global.json
-# --------------------------------------------------
+# ==================================================
+# Display .NET information
+# ==================================================
 - script: |
     set -e
 
@@ -45,23 +52,15 @@ steps:
     if [ -f "$(Build.SourcesDirectory)/global.json" ]; then
       cat "$(Build.SourcesDirectory)/global.json"
     else
-      echo "ERROR: global.json was not found!"
-      exit 1
+      echo "No global.json found."
     fi
 
-    echo ""
-    echo "=========================================="
-    echo " TEST RUNNER"
-    echo "=========================================="
-
-    dotnet test --help | head -80
-
-  displayName: 'Verify .NET and Microsoft Testing Platform'
+  displayName: 'Display .NET information'
 
 
-# --------------------------------------------------
-# Clean previous build artifacts
-# --------------------------------------------------
+# ==================================================
+# Clean
+# ==================================================
 - script: |
     set -e
 
@@ -79,12 +78,14 @@ steps:
 
     mkdir -p "$(TEST_RESULTS)"
 
-  displayName: 'Clean build and test artifacts'
+    echo "Clean completed."
+
+  displayName: 'Clean build artifacts'
 
 
-# --------------------------------------------------
+# ==================================================
 # Restore
-# --------------------------------------------------
+# ==================================================
 - script: |
     set -e
 
@@ -92,14 +93,15 @@ steps:
     echo " RESTORE"
     echo "=========================================="
 
+    dotnet restore "$(API_PROJECT)"
     dotnet restore "$(TEST_PROJECT)"
 
-  displayName: 'Restore projects'
+  displayName: 'Restore NuGet packages'
 
 
-# --------------------------------------------------
+# ==================================================
 # Build API
-# --------------------------------------------------
+# ==================================================
 - script: |
     set -e
 
@@ -114,14 +116,14 @@ steps:
   displayName: 'Build API'
 
 
-# --------------------------------------------------
+# ==================================================
 # Build Tests
-# --------------------------------------------------
+# ==================================================
 - script: |
     set -e
 
     echo "=========================================="
-    echo " BUILD TESTS"
+    echo " BUILD TEST PROJECT"
     echo "=========================================="
 
     dotnet build "$(TEST_PROJECT)" \
@@ -131,9 +133,9 @@ steps:
   displayName: 'Build tests'
 
 
-# --------------------------------------------------
-# Run Tests + Native Microsoft Code Coverage
-# --------------------------------------------------
+# ==================================================
+# Run Tests + Code Coverage
+# ==================================================
 - script: |
     set -e
 
@@ -152,44 +154,332 @@ steps:
   displayName: 'Run tests and collect code coverage'
 
 
-# --------------------------------------------------
-# Show generated coverage files
-# --------------------------------------------------
+# ==================================================
+# Analyze Coverage
+# ==================================================
 - script: |
+    set -e
+
     echo "=========================================="
-    echo " COVERAGE FILES"
+    echo " FIND COVERAGE FILE"
     echo "=========================================="
 
-    echo ""
-    echo "TestResults directory:"
-    find "$(TEST_RESULTS)" \
-      -type f \
-      -print || true
-
-    echo ""
-    echo "All Cobertura files:"
-    find "$(Build.SourcesDirectory)" \
+    COVERAGE_FILE=$(find "$(TEST_RESULTS)" \
       -type f \
       -name "*.cobertura.xml" \
-      -print || true
+      | head -n 1)
+
+    if [ -z "$COVERAGE_FILE" ]; then
+      echo ""
+      echo "ERROR: Cobertura coverage file was not found."
+      echo ""
+
+      echo "Files found:"
+      find "$(TEST_RESULTS)" -type f -print || true
+
+      exit 1
+    fi
 
     echo ""
-    echo "All coverage files:"
-    find "$(TEST_RESULTS)" \
-      -type f \
-      \( \
-        -name "*.cobertura.xml" \
-        -o -name "*.xml" \
-        -o -name "*.coverage" \
-      \) \
-      -print || true
+    echo "Coverage file:"
+    echo "$COVERAGE_FILE"
 
-  displayName: 'Locate coverage results'
+    # ==================================================
+    # Create Python coverage analyzer
+    #
+    # IMPORTANT:
+    # The entire heredoc is indented inside the YAML
+    # script block.
+    # ==================================================
+
+    cat > "$(Agent.TempDirectory)/analyze_coverage.py" <<'PYTHON'
+    import sys
+    import xml.etree.ElementTree as ET
 
 
-# --------------------------------------------------
+    coverage_file = sys.argv[1]
+    minimum_coverage = float(sys.argv[2])
+
+
+    # ==================================================
+    # Read Cobertura XML
+    # ==================================================
+
+    tree = ET.parse(coverage_file)
+    root = tree.getroot()
+
+
+    # ==================================================
+    # Overall line coverage
+    # ==================================================
+
+    line_rate = float(root.attrib.get("line-rate", 0)) * 100
+
+
+    # ==================================================
+    # Analyze source files
+    # ==================================================
+
+    files = {}
+
+
+    for class_node in root.findall(".//class"):
+
+        filename = class_node.attrib.get(
+            "filename",
+            "Unknown"
+        )
+
+        lines_node = class_node.find("lines")
+
+        if lines_node is None:
+            continue
+
+        file_total = 0
+        file_covered = 0
+
+        for line in lines_node.findall("line"):
+
+            hits = int(
+                line.attrib.get("hits", 0)
+            )
+
+            file_total += 1
+
+            if hits > 0:
+                file_covered += 1
+
+        if file_total == 0:
+            continue
+
+        if filename not in files:
+            files[filename] = {
+                "total": 0,
+                "covered": 0
+            }
+
+        files[filename]["total"] += file_total
+        files[filename]["covered"] += file_covered
+
+
+    # ==================================================
+    # Calculate file statistics
+    # ==================================================
+
+    total_files = len(files)
+
+    covered_files = 0
+    fully_covered_files = 0
+    uncovered_files = []
+
+    total_lines = 0
+    covered_lines = 0
+
+
+    for filename, data in files.items():
+
+        total = data["total"]
+        covered = data["covered"]
+
+        total_lines += total
+        covered_lines += covered
+
+        if covered > 0:
+            covered_files += 1
+
+        if total > 0 and covered == total:
+            fully_covered_files += 1
+
+        if covered == 0:
+            uncovered_files.append(filename)
+
+
+    uncovered_lines = total_lines - covered_lines
+
+
+    if total_files > 0:
+        file_coverage = (
+            covered_files / total_files
+        ) * 100
+    else:
+        file_coverage = 0
+
+
+    if total_files > 0:
+        fully_covered_file_percentage = (
+            fully_covered_files / total_files
+        ) * 100
+    else:
+        fully_covered_file_percentage = 0
+
+
+    # ==================================================
+    # Print coverage summary
+    # ==================================================
+
+    print("")
+    print("==========================================")
+    print(" CODE COVERAGE SUMMARY")
+    print("==========================================")
+
+    print(
+        f"Source files             : {total_files}"
+    )
+
+    print(
+        f"Files with coverage      : {covered_files}"
+    )
+
+    print(
+        f"Files with no coverage   : {len(uncovered_files)}"
+    )
+
+    print(
+        f"Fully covered files      : {fully_covered_files}"
+    )
+
+    print(
+        f"File coverage            : "
+        f"{file_coverage:.2f}%"
+    )
+
+    print(
+        f"Fully covered file %     : "
+        f"{fully_covered_file_percentage:.2f}%"
+    )
+
+    print("")
+
+    print(
+        f"Total lines              : {total_lines}"
+    )
+
+    print(
+        f"Covered lines            : {covered_lines}"
+    )
+
+    print(
+        f"Uncovered lines          : {uncovered_lines}"
+    )
+
+    print(
+        f"Line coverage            : "
+        f"{line_rate:.2f}%"
+    )
+
+
+    # ==================================================
+    # Quality gate
+    # ==================================================
+
+    print("")
+    print("==========================================")
+    print(" QUALITY GATE")
+    print("==========================================")
+
+    print(
+        f"Required line coverage   : "
+        f"{minimum_coverage:.2f}%"
+    )
+
+    print(
+        f"Actual line coverage     : "
+        f"{line_rate:.2f}%"
+    )
+
+
+    # ==================================================
+    # Files with zero coverage
+    # ==================================================
+
+    print("")
+    print("==========================================")
+    print(" FILES WITH ZERO COVERAGE")
+    print("==========================================")
+
+
+    if uncovered_files:
+
+        for filename in sorted(uncovered_files):
+            print(f"  {filename}")
+
+    else:
+
+        print("  None")
+
+
+    # ==================================================
+    # Azure DevOps variables
+    # ==================================================
+
+    print("")
+
+    print(
+        f"##vso[task.setvariable variable=LineCoverage]"
+        f"{line_rate:.2f}"
+    )
+
+    print(
+        f"##vso[task.setvariable variable=CoveredFiles]"
+        f"{covered_files}"
+    )
+
+    print(
+        f"##vso[task.setvariable variable=TotalFiles]"
+        f"{total_files}"
+    )
+
+    print(
+        f"##vso[task.setvariable variable=CoveredLines]"
+        f"{covered_lines}"
+    )
+
+    print(
+        f"##vso[task.setvariable variable=TotalLines]"
+        f"{total_lines}"
+    )
+
+
+    # ==================================================
+    # Enforce quality gate
+    # ==================================================
+
+    print("")
+    print("==========================================")
+
+
+    if line_rate >= minimum_coverage:
+
+        print("QUALITY GATE: PASSED")
+
+        print(
+            f"Coverage {line_rate:.2f}% "
+            f">= {minimum_coverage:.2f}%"
+        )
+
+    else:
+
+        print("QUALITY GATE: FAILED")
+
+        print(
+            f"Coverage {line_rate:.2f}% "
+            f"< {minimum_coverage:.2f}%"
+        )
+
+        print("")
+        print(
+            "Pipeline will stop because "
+            "coverage is below the required threshold."
+        )
+
+        sys.exit(1)
+
+  displayName: 'Analyze and enforce code coverage'
+
+
+# ==================================================
 # Publish Code Coverage
-# --------------------------------------------------
+# ==================================================
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
