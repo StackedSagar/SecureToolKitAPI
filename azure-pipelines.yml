@@ -15,19 +15,19 @@ variables:
 
 steps:
 
-# ============================================================
-# Install .NET 10 SDK
-# ============================================================
+# --------------------------------------------------
+# Install .NET 10
+# --------------------------------------------------
 - task: UseDotNet@2
   displayName: 'Install .NET 10'
   inputs:
     packageType: 'sdk'
-    version: '10.x'
+    version: '10.0.400'
 
 
-# ============================================================
-# Clean, Restore, Build and Test
-# ============================================================
+# --------------------------------------------------
+# Verify .NET + global.json
+# --------------------------------------------------
 - script: |
     set -e
 
@@ -37,17 +37,37 @@ steps:
 
     dotnet --info
 
+    echo ""
+    echo "=========================================="
+    echo " GLOBAL.JSON"
+    echo "=========================================="
+
+    if [ -f "$(Build.SourcesDirectory)/global.json" ]; then
+      cat "$(Build.SourcesDirectory)/global.json"
+    else
+      echo "ERROR: global.json was not found!"
+      exit 1
+    fi
+
+    echo ""
+    echo "=========================================="
+    echo " TEST RUNNER"
+    echo "=========================================="
+
+    dotnet test --help | head -80
+
+  displayName: 'Verify .NET and Microsoft Testing Platform'
+
+
+# --------------------------------------------------
+# Clean previous build artifacts
+# --------------------------------------------------
+- script: |
+    set -e
+
     echo "=========================================="
     echo " CLEAN"
     echo "=========================================="
-
-    # Remove previous build artifacts so generated
-    # MTP/Coverlet files cannot be reused.
-    dotnet clean "$(API_PROJECT)" \
-      --configuration Release
-
-    dotnet clean "$(TEST_PROJECT)" \
-      --configuration Release
 
     rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/bin"
     rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/obj"
@@ -59,17 +79,29 @@ steps:
 
     mkdir -p "$(TEST_RESULTS)"
 
-    echo "=========================================="
-    echo " RESTORE API"
-    echo "=========================================="
+  displayName: 'Clean build and test artifacts'
 
-    dotnet restore "$(API_PROJECT)"
+
+# --------------------------------------------------
+# Restore
+# --------------------------------------------------
+- script: |
+    set -e
 
     echo "=========================================="
-    echo " RESTORE TESTS"
+    echo " RESTORE"
     echo "=========================================="
 
     dotnet restore "$(TEST_PROJECT)"
+
+  displayName: 'Restore projects'
+
+
+# --------------------------------------------------
+# Build API
+# --------------------------------------------------
+- script: |
+    set -e
 
     echo "=========================================="
     echo " BUILD API"
@@ -79,6 +111,15 @@ steps:
       --configuration Release \
       --no-restore
 
+  displayName: 'Build API'
+
+
+# --------------------------------------------------
+# Build Tests
+# --------------------------------------------------
+- script: |
+    set -e
+
     echo "=========================================="
     echo " BUILD TESTS"
     echo "=========================================="
@@ -86,6 +127,15 @@ steps:
     dotnet build "$(TEST_PROJECT)" \
       --configuration Release \
       --no-restore
+
+  displayName: 'Build tests'
+
+
+# --------------------------------------------------
+# Run Tests + Native Microsoft Code Coverage
+# --------------------------------------------------
+- script: |
+    set -e
 
     echo "=========================================="
     echo " RUN TESTS + CODE COVERAGE"
@@ -96,38 +146,53 @@ steps:
       --no-build \
       --no-restore \
       --results-directory "$(TEST_RESULTS)" \
-      --coverlet \
-      --coverlet-output-format cobertura
+      --coverage \
+      --coverage-output-format cobertura
 
+  displayName: 'Run tests and collect code coverage'
+
+
+# --------------------------------------------------
+# Show generated coverage files
+# --------------------------------------------------
+- script: |
     echo "=========================================="
-    echo " SEARCHING FOR COVERAGE FILE"
+    echo " COVERAGE FILES"
     echo "=========================================="
 
-    echo "TestResults:"
+    echo ""
+    echo "TestResults directory:"
     find "$(TEST_RESULTS)" \
       -type f \
       -print || true
 
     echo ""
-    echo "All coverage files:"
+    echo "All Cobertura files:"
     find "$(Build.SourcesDirectory)" \
       -type f \
+      -name "*.cobertura.xml" \
+      -print || true
+
+    echo ""
+    echo "All coverage files:"
+    find "$(TEST_RESULTS)" \
+      -type f \
       \( \
-        -name "coverage.cobertura.xml" \
-        -o -name "coverage.json" \
-        -o -name "coverage.info" \
+        -name "*.cobertura.xml" \
+        -o -name "*.xml" \
+        -o -name "*.coverage" \
       \) \
       -print || true
 
-  displayName: 'Build API, build tests and run coverage tests'
+  displayName: 'Locate coverage results'
 
 
-# ============================================================
+# --------------------------------------------------
 # Publish Code Coverage
-# ============================================================
+# --------------------------------------------------
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(Build.SourcesDirectory)/**/coverage.cobertura.xml'
+    summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/*.cobertura.xml'
     pathToSources: '$(Build.SourcesDirectory)'
     failIfCoverageEmpty: true
