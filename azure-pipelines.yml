@@ -9,11 +9,14 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+variables:
+  API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
+  TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
 
-- script: 
-    echo CloudLearning Azure Pipeline is working!
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+steps:
+
+- script: dotnet restore $(API_PROJECT)
+  displayName: 'Restore .NET API'
+
+- script: dotnet build $(API_PROJECT) --no-restore
+  displayName: 'Build .NET API'
