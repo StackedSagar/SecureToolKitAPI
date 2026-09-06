@@ -18,7 +18,6 @@ steps:
 # =========================================================
 # Restore API
 # =========================================================
-
 - script: |
     dotnet restore "$(API_PROJECT)"
   displayName: 'Restore .NET API'
@@ -27,7 +26,6 @@ steps:
 # =========================================================
 # Build API
 # =========================================================
-
 - script: |
     dotnet build "$(API_PROJECT)" --no-restore
   displayName: 'Build .NET API'
@@ -36,7 +34,6 @@ steps:
 # =========================================================
 # Restore tests
 # =========================================================
-
 - script: |
     dotnet restore "$(TEST_PROJECT)"
   displayName: 'Restore .NET tests'
@@ -45,7 +42,6 @@ steps:
 # =========================================================
 # Create Microsoft Code Coverage settings
 # =========================================================
-
 - script: |
     cat > "$(Build.SourcesDirectory)/coverage.runsettings" <<'EOF'
     <?xml version="1.0" encoding="utf-8"?>
@@ -64,160 +60,93 @@ steps:
 
     echo "Created coverage.runsettings:"
     cat "$(Build.SourcesDirectory)/coverage.runsettings"
-
-  displayName: 'Create Code Coverage settings'
+  displayName: 'Create Microsoft Code Coverage settings'
 
 
 # =========================================================
 # Run tests with Microsoft Code Coverage
 # =========================================================
-
 - script: |
     dotnet test "$(TEST_PROJECT)" \
       --no-restore \
       --collect:"Code Coverage" \
       --settings "$(Build.SourcesDirectory)/coverage.runsettings"
-
-  displayName: 'Run .NET tests with Microsoft Code Coverage'
+  displayName: 'Run tests with Microsoft Code Coverage'
 
 
 # =========================================================
-# Find the actual Microsoft .coverage file
+# Find coverage output
 # =========================================================
-
 - script: |
-    echo "========================================"
-    echo "Searching for Microsoft Code Coverage"
-    echo "========================================"
+    echo "Searching for coverage files..."
 
     echo ""
-    echo "Searching under Build.SourcesDirectory:"
+    echo "=== .coverage files ==="
     find "$(Build.SourcesDirectory)" \
       -type f \
       -name "*.coverage" \
       -print
 
     echo ""
-    echo "Searching under Agent.BuildDirectory:"
-    find "$(Agent.BuildDirectory)" \
+    echo "=== Cobertura files ==="
+    find "$(Build.SourcesDirectory)" \
       -type f \
-      -name "*.coverage" \
+      -iname "*cobertura*.xml" \
       -print
 
     echo ""
-    echo "Searching under Agent.TempDirectory:"
-    find "$(Agent.TempDirectory)" \
+    echo "=== TestResults ==="
+    find "$(Build.SourcesDirectory)" \
+      -path "*/TestResults/*" \
       -type f \
-      -name "*.coverage" \
       -print
-
-  displayName: 'Find Microsoft coverage file'
+  displayName: 'Find coverage output'
 
 
 # =========================================================
-# Locate coverage file and save path
+# Locate Cobertura report
 # =========================================================
-
 - script: |
-    COVERAGE_FILE=$(find "$(Agent.BuildDirectory)" \
+    COVERAGE_XML=$(find "$(Build.SourcesDirectory)" \
       -type f \
-      -name "*.coverage" \
+      -name "coverage.cobertura.xml" \
       -print -quit)
 
-    if [ -z "$COVERAGE_FILE" ]; then
-      echo "ERROR: No .coverage file was found."
-      echo ""
-      echo "Searching entire agent workspace:"
-      find "$(Agent.BuildDirectory)" -type f -print
+    if [ -z "$COVERAGE_XML" ]; then
+      echo "ERROR: coverage.cobertura.xml was not found."
       exit 1
     fi
 
-    echo "========================================"
-    echo "Coverage file found:"
-    echo "$COVERAGE_FILE"
-    echo "========================================"
+    echo "Coverage report found:"
+    echo "$COVERAGE_XML"
 
-    echo "##vso[task.setvariable variable=COVERAGE_FILE]$COVERAGE_FILE"
-
-  displayName: 'Set coverage file path'
-
-
-# =========================================================
-# Install ReportGenerator
-# =========================================================
-
-- script: |
-    dotnet tool install -g dotnet-reportgenerator-globaltool
-  displayName: 'Install ReportGenerator'
-
-
-# =========================================================
-# Create output directory
-# =========================================================
-
-- script: |
     mkdir -p "$(COVERAGE_DIR)"
-  displayName: 'Create coverage output directory'
+
+    cp "$COVERAGE_XML" "$(COVERAGE_DIR)/coverage.cobertura.xml"
+  displayName: 'Prepare Cobertura report'
 
 
 # =========================================================
-# Convert Microsoft .coverage to Cobertura
+# Verify Cobertura report
 # =========================================================
-
 - script: |
-    echo "========================================"
-    echo "Converting coverage"
-    echo "========================================"
+    echo "Coverage report:"
+    echo "================"
 
-    echo "Input:"
-    echo "$(COVERAGE_FILE)"
-
-    echo ""
-    echo "Output:"
-    echo "$(COVERAGE_DIR)"
-
-    reportgenerator \
-      "-reports:$(COVERAGE_FILE)" \
-      "-targetdir:$(COVERAGE_DIR)" \
-      "-reporttypes:Cobertura"
-
-  displayName: 'Convert coverage to Cobertura'
-
-
-# =========================================================
-# Verify generated Cobertura report
-# =========================================================
-
-- script: |
-    echo "========================================"
-    echo "Generated files"
-    echo "========================================"
-
-    find "$(COVERAGE_DIR)" -type f -print
-
-    echo ""
-    echo "========================================"
-    echo "Checking Cobertura.xml"
-    echo "========================================"
-
-    if [ ! -f "$(COVERAGE_DIR)/Cobertura.xml" ]; then
-      echo "ERROR: Cobertura.xml was not generated."
+    if [ ! -f "$(COVERAGE_DIR)/coverage.cobertura.xml" ]; then
+      echo "ERROR: Coverage report does not exist."
       exit 1
     fi
 
-    echo ""
-    echo "Cobertura report:"
-    head -100 "$(COVERAGE_DIR)/Cobertura.xml"
-
-  displayName: 'Verify Cobertura report'
+    head -100 "$(COVERAGE_DIR)/coverage.cobertura.xml"
+  displayName: 'Verify coverage report'
 
 
 # =========================================================
 # Publish code coverage
 # =========================================================
-
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(COVERAGE_DIR)/Cobertura.xml'
+    summaryFileLocation: '$(COVERAGE_DIR)/coverage.cobertura.xml'
     failIfCoverageEmpty: true
