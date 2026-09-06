@@ -23,5 +23,5 @@ steps:
 - script: dotnet restore $(TEST_PROJECT)
   displayName: 'Restore .NET tests'
 
-- script: dotnet test $(TEST_PROJECT) --no-restore --collect:"XPlat Code Coverage"
+- script: dotnet test $(TEST_PROJECT) --no-restore --collect:"Code Coverage"
   displayName: 'Run .NET tests with coverage'
