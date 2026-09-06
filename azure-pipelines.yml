@@ -20,3 +20,6 @@ steps:
 
 - script: dotnet build $(API_PROJECT) --no-restore
   displayName: 'Build .NET API'
+
+- script: dotnet test $(TEST_PROJECT) --no-restore
+  displayName: 'Run .NET tests'
