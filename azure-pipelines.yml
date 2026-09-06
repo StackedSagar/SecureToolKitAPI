@@ -12,39 +12,55 @@ pool:
 variables:
   API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
   TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
+  TEST_RESULTS: '$(Agent.TempDirectory)/TestResults'
 
 steps:
 
+# Install .NET 10 SDK
 - task: UseDotNet@2
   displayName: 'Install .NET 10'
   inputs:
     packageType: 'sdk'
     version: '10.x'
 
+# Restore, build and test
 - script: |
+    echo "=== .NET Info ==="
+    dotnet --info
+
+    echo "=== Restore API ==="
     dotnet restore "$(API_PROJECT)"
+
+    echo "=== Restore Tests ==="
     dotnet restore "$(TEST_PROJECT)"
 
+    echo "=== Build API ==="
     dotnet build "$(API_PROJECT)" \
       --configuration Release \
       --no-restore
 
+    echo "=== Build Tests ==="
     dotnet build "$(TEST_PROJECT)" \
       --configuration Release \
       --no-restore
 
+    echo "=== Run Tests + Code Coverage ==="
     dotnet test "$(TEST_PROJECT)" \
       --configuration Release \
       --no-build \
       --no-restore \
-      --collect:"Code Coverage;Format=Cobertura" \
-      --results-directory "$(Agent.TempDirectory)/TestResults"
+      --results-directory "$(TEST_RESULTS)" \
+      --coverlet \
+      --coverlet-output-format cobertura
+
+    echo "=== Generated Test Results ==="
+    find "$(TEST_RESULTS)" -type f -print
   displayName: 'Build API, build tests and run coverage tests'
 
+# Publish Cobertura coverage to Azure DevOps
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
+    summaryFileLocation: '$(TEST_RESULTS)/**/coverage.cobertura.xml'
     pathToSources: '$(Build.SourcesDirectory)'
     failIfCoverageEmpty: true
-
