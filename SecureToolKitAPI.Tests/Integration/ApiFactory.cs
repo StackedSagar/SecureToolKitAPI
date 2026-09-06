@@ -12,8 +12,9 @@ namespace SecureToolKitAPI.Tests.Integration
     /// exercise the same pipeline a caller would reach.
     /// </summary>
     /// <remarks>
-    /// The testing environment prevents external services from being contacted while the generated OpenAPI
-    /// document remains available for the integration tests.
+    /// The testing environment is used to skip Azure KeyVault initialization while still serving the OpenAPI
+    /// document for documentation checks. This prevents authentication failures when running tests locally or
+    /// in environments without Azure credentials configured.
     /// </remarks>
     public sealed class ApiFactory : WebApplicationFactory<Program>
     {
