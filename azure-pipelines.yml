@@ -15,25 +15,33 @@ variables:
 
 steps:
 
+# ---------------------------------------------------------
 # Restore API
+# ---------------------------------------------------------
 - script: |
     dotnet restore "$(API_PROJECT)"
   displayName: 'Restore .NET API'
 
 
+# ---------------------------------------------------------
 # Build API
+# ---------------------------------------------------------
 - script: |
     dotnet build "$(API_PROJECT)" --no-restore
   displayName: 'Build .NET API'
 
 
+# ---------------------------------------------------------
 # Restore tests
+# ---------------------------------------------------------
 - script: |
     dotnet restore "$(TEST_PROJECT)"
   displayName: 'Restore .NET tests'
 
 
+# ---------------------------------------------------------
 # Create Microsoft Code Coverage settings
+# ---------------------------------------------------------
 - script: |
     cat > "$(Build.SourcesDirectory)/coverage.runsettings" <<'EOF'
     <?xml version="1.0" encoding="utf-8"?>
@@ -50,12 +58,13 @@ steps:
     </RunSettings>
     EOF
 
-    echo "Created coverage.runsettings:"
-    cat "$(Build.SourcesDirectory)/coverage.runsettings"
+    echo "Created coverage.runsettings"
   displayName: 'Create Code Coverage settings'
 
 
+# ---------------------------------------------------------
 # Run tests with Microsoft Code Coverage
+# ---------------------------------------------------------
 - script: |
     dotnet test "$(TEST_PROJECT)" \
       --no-restore \
@@ -64,9 +73,11 @@ steps:
   displayName: 'Run .NET tests with Microsoft Code Coverage'
 
 
+# ---------------------------------------------------------
 # Find generated coverage files
+# ---------------------------------------------------------
 - script: |
-    echo "=== .coverage files ==="
+    echo "=== Microsoft .coverage files ==="
 
     find "$(Build.SourcesDirectory)" \
       -type f \
@@ -83,52 +94,60 @@ steps:
   displayName: 'Find coverage files'
 
 
+# ---------------------------------------------------------
 # Install ReportGenerator
+# ---------------------------------------------------------
 - script: |
     dotnet tool install -g dotnet-reportgenerator-globaltool
-
-    echo "ReportGenerator:"
-    reportgenerator --version
   displayName: 'Install ReportGenerator'
 
 
+# ---------------------------------------------------------
 # Create coverage output directory
+# ---------------------------------------------------------
 - script: |
     mkdir -p "$(COVERAGE_DIR)"
   displayName: 'Create coverage output directory'
 
 
+# ---------------------------------------------------------
 # Convert Microsoft .coverage to Cobertura
+# ---------------------------------------------------------
 - script: |
-    echo "Converting Microsoft Code Coverage..."
+    echo "Converting Microsoft Code Coverage to Cobertura..."
 
     reportgenerator \
-      "-reports:$(Build.SourcesDirectory)/**/*.coverage" \
+      "-reports:$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/TestResults/**/*.coverage" \
       "-targetdir:$(COVERAGE_DIR)" \
       "-reporttypes:Cobertura"
-
   displayName: 'Convert coverage to Cobertura'
 
 
-# Verify Cobertura
+# ---------------------------------------------------------
+# Verify Cobertura report
+# ---------------------------------------------------------
 - script: |
     echo "=== Generated coverage files ==="
 
-    find "$(COVERAGE_DIR)" -type f -print
+    find "$(COVERAGE_DIR)" \
+      -type f \
+      -print
 
     echo ""
     echo "=== Cobertura.xml ==="
 
-    if [ -f "$(COVERAGE_DIR)/Cobertura.xml" ]; then
-      head -100 "$(COVERAGE_DIR)/Cobertura.xml"
-    else
+    if [ ! -f "$(COVERAGE_DIR)/Cobertura.xml" ]; then
       echo "ERROR: Cobertura.xml was not generated."
       exit 1
     fi
+
+    head -100 "$(COVERAGE_DIR)/Cobertura.xml"
   displayName: 'Verify Cobertura report'
 
 
-# Publish coverage
+# ---------------------------------------------------------
+# Publish code coverage
+# ---------------------------------------------------------
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
