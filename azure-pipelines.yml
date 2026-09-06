@@ -2,7 +2,6 @@
 # Start with a minimal pipeline that you can customize to build and deploy your code.
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
-
 trigger:
 - main
 
@@ -16,33 +15,47 @@ variables:
 
 steps:
 
-# ---------------------------------------------------------
 # Restore API
-# ---------------------------------------------------------
 - script: |
     dotnet restore "$(API_PROJECT)"
   displayName: 'Restore .NET API'
 
 
-# ---------------------------------------------------------
 # Build API
-# ---------------------------------------------------------
 - script: |
     dotnet build "$(API_PROJECT)" --no-restore
   displayName: 'Build .NET API'
 
 
-# ---------------------------------------------------------
 # Restore tests
-# ---------------------------------------------------------
 - script: |
     dotnet restore "$(TEST_PROJECT)"
   displayName: 'Restore .NET tests'
 
 
-# ---------------------------------------------------------
+# Create Microsoft Code Coverage settings
+- script: |
+    cat > "$(Build.SourcesDirectory)/coverage.runsettings" <<'EOF'
+    <?xml version="1.0" encoding="utf-8"?>
+    <RunSettings>
+      <DataCollectionRunSettings>
+        <DataCollectors>
+          <DataCollector friendlyName="Code Coverage">
+            <Configuration>
+              <Format>cobertura</Format>
+            </Configuration>
+          </DataCollector>
+        </DataCollectors>
+      </DataCollectionRunSettings>
+    </RunSettings>
+    EOF
+
+    echo "Created coverage.runsettings:"
+    cat "$(Build.SourcesDirectory)/coverage.runsettings"
+  displayName: 'Create Code Coverage settings'
+
+
 # Run tests with Microsoft Code Coverage
-# ---------------------------------------------------------
 - script: |
     dotnet test "$(TEST_PROJECT)" \
       --no-restore \
@@ -51,14 +64,10 @@ steps:
   displayName: 'Run .NET tests with Microsoft Code Coverage'
 
 
-# ---------------------------------------------------------
-# Show generated coverage files
-# ---------------------------------------------------------
+# Find generated coverage files
 - script: |
-    echo "Searching for coverage files..."
-
-    echo ""
     echo "=== .coverage files ==="
+
     find "$(Build.SourcesDirectory)" \
       -type f \
       -name "*.coverage" \
@@ -66,6 +75,7 @@ steps:
 
     echo ""
     echo "=== Cobertura files ==="
+
     find "$(Build.SourcesDirectory)" \
       -type f \
       \( -name "coverage.cobertura.xml" -o -name "Cobertura.xml" \) \
@@ -73,30 +83,24 @@ steps:
   displayName: 'Find coverage files'
 
 
-# ---------------------------------------------------------
 # Install ReportGenerator
-# ---------------------------------------------------------
 - script: |
     dotnet tool install -g dotnet-reportgenerator-globaltool
 
-    echo "ReportGenerator version:"
+    echo "ReportGenerator:"
     reportgenerator --version
   displayName: 'Install ReportGenerator'
 
 
-# ---------------------------------------------------------
-# Create output directory
-# ---------------------------------------------------------
+# Create coverage output directory
 - script: |
     mkdir -p "$(COVERAGE_DIR)"
   displayName: 'Create coverage output directory'
 
 
-# ---------------------------------------------------------
 # Convert Microsoft .coverage to Cobertura
-# ---------------------------------------------------------
 - script: |
-    echo "Converting Microsoft Code Coverage to Cobertura..."
+    echo "Converting Microsoft Code Coverage..."
 
     reportgenerator \
       "-reports:$(Build.SourcesDirectory)/**/*.coverage" \
@@ -106,15 +110,11 @@ steps:
   displayName: 'Convert coverage to Cobertura'
 
 
-# ---------------------------------------------------------
-# Verify generated Cobertura report
-# ---------------------------------------------------------
+# Verify Cobertura
 - script: |
     echo "=== Generated coverage files ==="
 
-    find "$(COVERAGE_DIR)" \
-      -type f \
-      -print
+    find "$(COVERAGE_DIR)" -type f -print
 
     echo ""
     echo "=== Cobertura.xml ==="
@@ -128,9 +128,7 @@ steps:
   displayName: 'Verify Cobertura report'
 
 
-# ---------------------------------------------------------
-# Publish code coverage
-# ---------------------------------------------------------
+# Publish coverage
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
