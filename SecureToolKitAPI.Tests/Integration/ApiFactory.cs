@@ -12,12 +12,14 @@ namespace SecureToolKitAPI.Tests.Integration
     /// exercise the same pipeline a caller would reach.
     /// </summary>
     /// <remarks>
-    /// The development environment is selected so the generated OpenAPI document is served and can be checked.
+    /// The testing environment is used to skip Azure KeyVault initialization while still serving the OpenAPI
+    /// document for documentation checks. This prevents authentication failures when running tests locally or
+    /// in environments without Azure credentials configured.
     /// </remarks>
     public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         /// <inheritdoc />
-        protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Development");
+        protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Testing");
     }
 
     /// <summary>Shares one hosted API across the integration test classes instead of starting one per class.</summary>
