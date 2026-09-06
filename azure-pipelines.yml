@@ -8,7 +8,6 @@ trigger:
 
 pool:
   vmImage: ubuntu-latest
-
 variables:
   API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
   TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
@@ -20,6 +19,9 @@ steps:
 
 - script: dotnet build $(API_PROJECT) --no-restore
   displayName: 'Build .NET API'
+
+- script: dotnet restore $(TEST_PROJECT)
+  displayName: 'Restore .NET tests'
 
 - script: dotnet test $(TEST_PROJECT) --no-restore
   displayName: 'Run .NET tests'
