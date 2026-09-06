@@ -6,147 +6,140 @@ trigger:
 - main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 variables:
   API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
   TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
-  COVERAGE_DIR: '$(Build.ArtifactStagingDirectory)/CodeCoverage'
 
 steps:
 
-# =========================================================
-# Restore API
-# =========================================================
+# ============================================================
+# Install .NET 10
+# ============================================================
+- task: UseDotNet@2
+  displayName: 'Install .NET 10 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '10.x'
+
+
+# ============================================================
+# Restore
+# ============================================================
 - script: |
     dotnet restore "$(API_PROJECT)"
-  displayName: 'Restore .NET API'
-
-
-# =========================================================
-# Build API
-# =========================================================
-- script: |
-    dotnet build "$(API_PROJECT)" --no-restore
-  displayName: 'Build .NET API'
-
-
-# =========================================================
-# Restore tests
-# =========================================================
-- script: |
     dotnet restore "$(TEST_PROJECT)"
-  displayName: 'Restore .NET tests'
+  displayName: 'Restore'
 
 
-# =========================================================
-# Create Microsoft Code Coverage settings
-# =========================================================
+# ============================================================
+# Build
+# ============================================================
 - script: |
-    cat > "$(Build.SourcesDirectory)/coverage.runsettings" <<'EOF'
-    <?xml version="1.0" encoding="utf-8"?>
-    <RunSettings>
-      <DataCollectionRunSettings>
-        <DataCollectors>
-          <DataCollector friendlyName="Code Coverage">
-            <Configuration>
-              <Format>cobertura</Format>
-            </Configuration>
-          </DataCollector>
-        </DataCollectors>
-      </DataCollectionRunSettings>
-    </RunSettings>
-    EOF
+    dotnet build "$(API_PROJECT)" \
+      --configuration Release \
+      --no-restore
 
-    echo "Created coverage.runsettings:"
-    cat "$(Build.SourcesDirectory)/coverage.runsettings"
-  displayName: 'Create Microsoft Code Coverage settings'
+    dotnet build "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-restore
+  displayName: 'Build'
 
 
-# =========================================================
-# Run tests with Microsoft Code Coverage
-# =========================================================
+# ============================================================
+# Install ReportGenerator
+# ============================================================
+- script: |
+    dotnet tool install -g dotnet-reportgenerator-globaltool
+    echo "##vso[task.prependpath]$HOME/.dotnet/tools"
+  displayName: 'Install ReportGenerator'
+
+
+# ============================================================
+# Run tests using MICROSOFT Code Coverage
+# ============================================================
 - script: |
     dotnet test "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-build \
       --no-restore \
-      --collect:"Code Coverage" \
-      --settings "$(Build.SourcesDirectory)/coverage.runsettings"
+      --collect:"Code Coverage"
   displayName: 'Run tests with Microsoft Code Coverage'
 
 
-# =========================================================
-# Find coverage output
-# =========================================================
-- script: |
-    echo "Searching for coverage files..."
+# ============================================================
+# Find Microsoft .coverage file
+# ============================================================
+- bash: |
+    set -e
 
-    echo ""
-    echo "=== .coverage files ==="
-    find "$(Build.SourcesDirectory)" \
+    COVERAGE_FILE=$(find "$(Build.SourcesDirectory)" \
+      "$(Agent.TempDirectory)" \
+      "$(Agent.BuildDirectory)" \
       -type f \
       -name "*.coverage" \
-      -print
+      -print -quit 2>/dev/null || true)
 
-    echo ""
-    echo "=== Cobertura files ==="
-    find "$(Build.SourcesDirectory)" \
-      -type f \
-      -iname "*cobertura*.xml" \
-      -print
-
-    echo ""
-    echo "=== TestResults ==="
-    find "$(Build.SourcesDirectory)" \
-      -path "*/TestResults/*" \
-      -type f \
-      -print
-  displayName: 'Find coverage output'
-
-
-# =========================================================
-# Locate Cobertura report
-# =========================================================
-- script: |
-    COVERAGE_XML=$(find "$(Build.SourcesDirectory)" \
-      -type f \
-      -name "coverage.cobertura.xml" \
-      -print -quit)
-
-    if [ -z "$COVERAGE_XML" ]; then
-      echo "ERROR: coverage.cobertura.xml was not found."
+    if [ -z "$COVERAGE_FILE" ]; then
+      echo "ERROR: Microsoft Code Coverage .coverage file was not found."
       exit 1
     fi
 
-    echo "Coverage report found:"
-    echo "$COVERAGE_XML"
+    echo "Microsoft Code Coverage file:"
+    echo "$COVERAGE_FILE"
 
-    mkdir -p "$(COVERAGE_DIR)"
-
-    cp "$COVERAGE_XML" "$(COVERAGE_DIR)/coverage.cobertura.xml"
-  displayName: 'Prepare Cobertura report'
+    echo "##vso[task.setvariable variable=CoverageFile]$COVERAGE_FILE"
+  displayName: 'Locate Microsoft Code Coverage file'
 
 
-# =========================================================
-# Verify Cobertura report
-# =========================================================
-- script: |
-    echo "Coverage report:"
-    echo "================"
+# ============================================================
+# Convert Microsoft .coverage -> Cobertura XML
+# ============================================================
+- bash: |
+    set -e
 
-    if [ ! -f "$(COVERAGE_DIR)/coverage.cobertura.xml" ]; then
-      echo "ERROR: Coverage report does not exist."
+    mkdir -p "$(Build.ArtifactStagingDirectory)/CodeCoverage"
+
+    echo "Converting:"
+    echo "$(CoverageFile)"
+
+    reportgenerator \
+      "-reports:$(CoverageFile)" \
+      "-targetdir:$(Build.ArtifactStagingDirectory)/CodeCoverage" \
+      "-reporttypes:Cobertura"
+
+    echo ""
+    echo "Generated coverage files:"
+    find "$(Build.ArtifactStagingDirectory)/CodeCoverage" \
+      -type f \
+      -print
+
+    if [ ! -f "$(Build.ArtifactStagingDirectory)/CodeCoverage/Cobertura.xml" ]; then
+      echo "ERROR: ReportGenerator did not create Cobertura.xml"
       exit 1
     fi
-
-    head -100 "$(COVERAGE_DIR)/coverage.cobertura.xml"
-  displayName: 'Verify coverage report'
+  displayName: 'Convert coverage to Cobertura'
 
 
-# =========================================================
-# Publish code coverage
-# =========================================================
+# ============================================================
+# Publish Code Coverage to Azure DevOps
+# ============================================================
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(COVERAGE_DIR)/coverage.cobertura.xml'
+    summaryFileLocation: '$(Build.ArtifactStagingDirectory)/CodeCoverage/Cobertura.xml'
+    pathToSources: '$(Build.SourcesDirectory)'
     failIfCoverageEmpty: true
+
+
+# ============================================================
+# Publish coverage artifact
+# ============================================================
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish coverage artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/CodeCoverage'
+    ArtifactName: 'CodeCoverage'
+    publishLocation: 'Container'
+
