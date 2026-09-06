@@ -25,3 +25,8 @@ steps:
 
 - script: dotnet test $(TEST_PROJECT) --no-restore --collect:"Code Coverage"
   displayName: 'Run .NET tests with coverage'
+- task: PublishCodeCoverageResults@2
+  displayName: 'Publish code coverage'
+  inputs:
+    summaryFileLocation: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
+    failIfCoverageEmpty: true
