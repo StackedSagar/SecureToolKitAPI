@@ -23,24 +23,22 @@ steps:
 - script: dotnet restore $(TEST_PROJECT)
   displayName: 'Restore .NET tests'
 
-- script: dotnet test $(TEST_PROJECT) --no-restore --collect:"Code Coverage"
-  displayName: 'Run .NET tests with coverage'
+- script: |
+    dotnet test $(TEST_PROJECT) --no-restore --collect:"Code Coverage"
+  displayName: 'Run .NET tests with Microsoft Code Coverage'
 
-# Install ReportGenerator
 - script: dotnet tool install -g dotnet-reportgenerator-globaltool
   displayName: 'Install ReportGenerator'
 
-# Convert Microsoft .coverage -> Cobertura XML
 - script: |
     reportgenerator \
-      "-reports:$(Agent.TempDirectory)/**/*.coverage" \
-      "-targetdir:$(Agent.TempDirectory)/CodeCoverage" \
+      "-reports:$(Build.SourcesDirectory)/**/*.coverage" \
+      "-targetdir:$(Build.ArtifactStagingDirectory)/CodeCoverage" \
       "-reporttypes:Cobertura"
   displayName: 'Convert coverage to Cobertura'
 
-# Publish Cobertura
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(Agent.TempDirectory)/CodeCoverage/Cobertura.xml'
+    summaryFileLocation: '$(Build.ArtifactStagingDirectory)/CodeCoverage/Cobertura.xml'
     failIfCoverageEmpty: true
