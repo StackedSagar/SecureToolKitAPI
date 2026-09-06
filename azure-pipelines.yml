@@ -1,0 +1,50 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  API_PROJECT: './SecureToolKitAPI/SecureToolKitAPI.csproj'
+  TEST_PROJECT: './SecureToolKitAPI.Tests/SecureToolKitAPI.Tests.csproj'
+
+steps:
+
+- task: UseDotNet@2
+  displayName: 'Install .NET 10'
+  inputs:
+    packageType: 'sdk'
+    version: '10.x'
+
+- script: |
+    dotnet restore "$(API_PROJECT)"
+    dotnet restore "$(TEST_PROJECT)"
+
+    dotnet build "$(API_PROJECT)" \
+      --configuration Release \
+      --no-restore
+
+    dotnet build "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-restore
+
+    dotnet test "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-build \
+      --no-restore \
+      --collect:"Code Coverage;Format=Cobertura" \
+      --results-directory "$(Agent.TempDirectory)/TestResults"
+  displayName: 'Build API, build tests and run coverage tests'
+
+- task: PublishCodeCoverageResults@2
+  displayName: 'Publish code coverage'
+  inputs:
+    summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
+    pathToSources: '$(Build.SourcesDirectory)'
+    failIfCoverageEmpty: true
+
