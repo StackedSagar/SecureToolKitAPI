@@ -2,7 +2,6 @@
 # Start with a minimal pipeline that you can customize to build and deploy your code.
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
-
 trigger:
 - main
 
@@ -16,35 +15,82 @@ variables:
 
 steps:
 
+# ============================================================
 # Install .NET 10 SDK
+# ============================================================
 - task: UseDotNet@2
   displayName: 'Install .NET 10'
   inputs:
     packageType: 'sdk'
     version: '10.x'
 
-# Restore, build and test
+
+# ============================================================
+# Clean, Restore, Build and Test
+# ============================================================
 - script: |
-    echo "=== .NET Info ==="
+    set -e
+
+    echo "=========================================="
+    echo " .NET INFORMATION"
+    echo "=========================================="
+
     dotnet --info
 
-    echo "=== Restore API ==="
+    echo "=========================================="
+    echo " CLEAN"
+    echo "=========================================="
+
+    # Remove previous build artifacts so generated
+    # MTP/Coverlet files cannot be reused.
+    dotnet clean "$(API_PROJECT)" \
+      --configuration Release
+
+    dotnet clean "$(TEST_PROJECT)" \
+      --configuration Release
+
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/bin"
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/obj"
+
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/bin"
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/obj"
+
+    rm -rf "$(TEST_RESULTS)"
+
+    mkdir -p "$(TEST_RESULTS)"
+
+    echo "=========================================="
+    echo " RESTORE API"
+    echo "=========================================="
+
     dotnet restore "$(API_PROJECT)"
 
-    echo "=== Restore Tests ==="
+    echo "=========================================="
+    echo " RESTORE TESTS"
+    echo "=========================================="
+
     dotnet restore "$(TEST_PROJECT)"
 
-    echo "=== Build API ==="
+    echo "=========================================="
+    echo " BUILD API"
+    echo "=========================================="
+
     dotnet build "$(API_PROJECT)" \
       --configuration Release \
       --no-restore
 
-    echo "=== Build Tests ==="
+    echo "=========================================="
+    echo " BUILD TESTS"
+    echo "=========================================="
+
     dotnet build "$(TEST_PROJECT)" \
       --configuration Release \
       --no-restore
 
-    echo "=== Run Tests + Code Coverage ==="
+    echo "=========================================="
+    echo " RUN TESTS + CODE COVERAGE"
+    echo "=========================================="
+
     dotnet test "$(TEST_PROJECT)" \
       --configuration Release \
       --no-build \
@@ -53,14 +99,35 @@ steps:
       --coverlet \
       --coverlet-output-format cobertura
 
-    echo "=== Generated Test Results ==="
-    find "$(TEST_RESULTS)" -type f -print
+    echo "=========================================="
+    echo " SEARCHING FOR COVERAGE FILE"
+    echo "=========================================="
+
+    echo "TestResults:"
+    find "$(TEST_RESULTS)" \
+      -type f \
+      -print || true
+
+    echo ""
+    echo "All coverage files:"
+    find "$(Build.SourcesDirectory)" \
+      -type f \
+      \( \
+        -name "coverage.cobertura.xml" \
+        -o -name "coverage.json" \
+        -o -name "coverage.info" \
+      \) \
+      -print || true
+
   displayName: 'Build API, build tests and run coverage tests'
 
-# Publish Cobertura coverage to Azure DevOps
+
+# ============================================================
+# Publish Code Coverage
+# ============================================================
 - task: PublishCodeCoverageResults@2
   displayName: 'Publish code coverage'
   inputs:
-    summaryFileLocation: '$(TEST_RESULTS)/**/coverage.cobertura.xml'
+    summaryFileLocation: '$(Build.SourcesDirectory)/**/coverage.cobertura.xml'
     pathToSources: '$(Build.SourcesDirectory)'
     failIfCoverageEmpty: true
