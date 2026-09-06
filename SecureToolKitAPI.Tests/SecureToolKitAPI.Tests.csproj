@@ -9,6 +9,8 @@
 		<!-- Microsoft Testing Platform -->
 		<UseTestingPlatform>true</UseTestingPlatform>
 		<SkipVSTestRun>true</SkipVSTestRun>
+		<!-- Required for .NET 10 + MTP + coverlet.MTP -->
+		<TestingPlatformDotnetTestSupport>false</TestingPlatformDotnetTestSupport>
 		<!-- Coverlet -->
 		<ExcludeByAttribute>ExcludeFromCodeCoverage,GeneratedCode</ExcludeByAttribute>
 	</PropertyGroup>
@@ -29,7 +31,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- WebApplicationFactory hosts the API in-process. -->
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 
