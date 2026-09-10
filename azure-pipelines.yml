@@ -12,198 +12,216 @@ variables:
 
 steps:
 
-  - task: UseDotNet@2
-    displayName: Install .NET 10
-    inputs:
-      packageType: sdk
-      version: 10.x
+- task: UseDotNet@2
+  displayName: Install .NET 10
+  inputs:
+    packageType: sdk
+    version: 10.x
 
-  - script: |
-      set -e
-      echo "=========================================="
-      echo " .NET INFORMATION"
-      echo "=========================================="
-      dotnet --info
-      echo ""
+- script: |
+    set -e
 
-      if [ -f "$(Build.SourcesDirectory)/global.json" ]; then
-        echo "global.json:"
-        cat "$(Build.SourcesDirectory)/global.json"
-      fi
-    displayName: Display .NET information
+    echo "=========================================="
+    echo " .NET INFORMATION"
+    echo "=========================================="
 
-  - script: |
-      set -e
-      echo "=========================================="
-      echo " CLEAN"
-      echo "=========================================="
+    dotnet --info
+    echo ""
 
-      rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/bin"
-      rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/obj"
-      rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/bin"
-      rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/obj"
-      rm -rf "$(TEST_RESULTS)"
+    if [ -f "$(Build.SourcesDirectory)/global.json" ]; then
+      echo "global.json:"
+      cat "$(Build.SourcesDirectory)/global.json"
+    fi
+  displayName: Display .NET information
 
-      mkdir -p "$(TEST_RESULTS)"
-    displayName: Clean
+- script: |
+    set -e
 
-  - script: |
-      set -e
-      dotnet restore "$(API_PROJECT)"
-      dotnet restore "$(TEST_PROJECT)"
-    displayName: Restore
+    echo "=========================================="
+    echo " CLEAN"
+    echo "=========================================="
 
-  - script: |
-      set -e
-      dotnet build "$(API_PROJECT)" \
-        --configuration Release \
-        --no-restore
-    displayName: Build API
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/bin"
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI/obj"
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/bin"
+    rm -rf "$(Build.SourcesDirectory)/SecureToolKitAPI.Tests/obj"
+    rm -rf "$(TEST_RESULTS)"
 
-  - script: |
-      set -e
-      dotnet build "$(TEST_PROJECT)" \
-        --configuration Release \
-        --no-restore
-    displayName: Build tests
+    mkdir -p "$(TEST_RESULTS)"
+  displayName: Clean
 
-  - script: |
-      set -e
+- script: |
+    set -e
 
-      echo "=========================================="
-      echo " TESTS + CODE COVERAGE"
-      echo "=========================================="
+    dotnet restore "$(API_PROJECT)"
+    dotnet restore "$(TEST_PROJECT)"
+  displayName: Restore
 
-      dotnet test "$(TEST_PROJECT)" \
-        --configuration Release \
-        --no-build \
-        --no-restore \
-        --results-directory "$(TEST_RESULTS)" \
-        --settings "$(Build.SourcesDirectory)/coverlet.runsettings"
+- script: |
+    set -e
 
-    displayName: Run tests and collect coverage
+    dotnet build "$(API_PROJECT)" \
+      --configuration Release \
+      --no-restore
+  displayName: Build API
 
-  - script: |
-      set -e
+- script: |
+    set -e
 
-      echo "=========================================="
-      echo " FIND COVERAGE REPORT"
-      echo "=========================================="
+    dotnet build "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-restore
+  displayName: Build tests
 
-      COVERAGE_FILE=$(find "$(TEST_RESULTS)" \
-        -type f \
-        -name "*.cobertura.xml" \
-        | head -n 1)
+- script: |
+    set -e
 
-      if [ -z "$COVERAGE_FILE" ]; then
-        echo "ERROR: No Cobertura coverage file found."
-        find "$(TEST_RESULTS)" -type f -print || true
-        exit 1
-      fi
+    echo "=========================================="
+    echo " TESTS + CODE COVERAGE"
+    echo "=========================================="
 
-      echo "Coverage file:"
-      echo "$COVERAGE_FILE"
+    dotnet test "$(TEST_PROJECT)" \
+      --configuration Release \
+      --no-build \
+      --no-restore \
+      --results-directory "$(TEST_RESULTS)" \
+      --settings "$(Build.SourcesDirectory)/coverlet.runsettings"
 
-      echo "##vso[task.setvariable variable=COVERAGE_FILE]$COVERAGE_FILE"
+  displayName: Run tests and collect coverage
 
-    displayName: Find coverage report
+- script: |
+    set -e
 
-  - script: |
-      set -e
+    echo "=========================================="
+    echo " FIND COVERAGE REPORT"
+    echo "=========================================="
 
-      echo "=========================================="
-      echo " CODE COVERAGE QUALITY GATE"
-      echo "=========================================="
+    COVERAGE_FILE=$(find "$(TEST_RESULTS)" \
+      -type f \
+      -name "*.cobertura.xml" \
+      | head -n 1)
 
-      FILE="$(COVERAGE_FILE)"
+    if [ -z "$COVERAGE_FILE" ]; then
+      echo "ERROR: No Cobertura coverage file found."
+      find "$(TEST_RESULTS)" -type f -print || true
+      exit 1
+    fi
 
-      if [ ! -f "$FILE" ]; then
-        echo "ERROR: Coverage file not found."
-        exit 1
-      fi
+    echo "Coverage file:"
+    echo "$COVERAGE_FILE"
 
-      echo ""
-      echo "Coverage report:"
-      echo "$FILE"
+    echo "##vso[task.setvariable variable=COVERAGE_FILE]$COVERAGE_FILE"
 
-      echo ""
-      echo "Required line coverage:"
-      echo "$(MIN_LINE_COVERAGE)%"
+  displayName: Find coverage report
 
-      LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$FILE" \
-        | head -n 1 \
-        | cut -d'"' -f2)
+- script: |
+    set -e
 
-      if [ -z "$LINE_RATE" ]; then
-        echo "ERROR: Could not read line-rate from Cobertura report."
-        exit 1
-      fi
+    echo "=========================================="
+    echo " CODE COVERAGE QUALITY GATE"
+    echo "=========================================="
 
-      COVERAGE=$(awk "BEGIN { printf \"%.2f\", $LINE_RATE * 100 }")
+    FILE="$(COVERAGE_FILE)"
 
-      echo ""
-      echo "=========================================="
-      echo " COVERAGE RESULT"
-      echo "=========================================="
+    if [ ! -f "$FILE" ]; then
+      echo "ERROR: Coverage file not found."
+      exit 1
+    fi
 
-      echo "Line coverage: $COVERAGE%"
+    echo ""
+    echo "Coverage report:"
+    echo "$FILE"
 
-      echo ""
-      echo "=========================================="
-      echo " QUALITY GATE"
-      echo "=========================================="
+    echo ""
+    echo "Required line coverage:"
+    echo "$(MIN_LINE_COVERAGE)%"
 
-      awk \
-        -v actual="$COVERAGE" \
-        -v minimum="$(MIN_LINE_COVERAGE)" \
-        'BEGIN {
-          printf "Required coverage : %.2f%%\n", minimum
-          printf "Actual coverage   : %.2f%%\n", actual
+    LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$FILE" \
+      | head -n 1 \
+      | cut -d'"' -f2)
 
-          if (actual >= minimum) {
-            print ""
-            print "QUALITY GATE: PASSED"
-            printf "Coverage %.2f%% >= %.2f%%\n", actual, minimum
-            exit 0
-          }
+    if [ -z "$LINE_RATE" ]; then
+      echo "ERROR: Could not read line-rate from Cobertura report."
+      exit 1
+    fi
 
+    COVERAGE=$(awk "BEGIN { printf \"%.2f\", $LINE_RATE * 100 }")
+
+    echo ""
+    echo "=========================================="
+    echo " COVERAGE RESULT"
+    echo "=========================================="
+
+    echo "Line coverage: $COVERAGE%"
+
+    echo ""
+    echo "=========================================="
+    echo " QUALITY GATE"
+    echo "=========================================="
+
+    awk \
+      -v actual="$COVERAGE" \
+      -v minimum="$(MIN_LINE_COVERAGE)" \
+      'BEGIN {
+        printf "Required coverage : %.2f%%\n", minimum
+        printf "Actual coverage   : %.2f%%\n", actual
+
+        if (actual >= minimum) {
           print ""
-          print "QUALITY GATE: FAILED"
-          printf "Coverage %.2f%% < %.2f%%\n", actual, minimum
-          print ""
-          print "Pipeline failed because coverage is below the required threshold."
-          exit 1
-        }'
+          print "QUALITY GATE: PASSED"
+          printf "Coverage %.2f%% >= %.2f%%\n", actual, minimum
+          exit 0
+        }
 
-    displayName: Enforce coverage quality gate
+        print ""
+        print "QUALITY GATE: FAILED"
+        printf "Coverage %.2f%% < %.2f%%\n", actual, minimum
+        print ""
+        print "Pipeline failed because coverage is below the required threshold."
+        exit 1
+      }'
 
-  - task: PublishCodeCoverageResults@2
-    displayName: Publish code coverage
-    condition: succeededOrFailed()
-    inputs:
-      summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/*.cobertura.xml'
-      pathToSources: '$(Build.SourcesDirectory)'
-      failIfCoverageEmpty: true
+  displayName: Enforce coverage quality gate
 
-  # ==========================================
-  # PUBLISH API
-  # ==========================================
+- task: PublishCodeCoverageResults@2
+  displayName: Publish code coverage
+  condition: succeededOrFailed()
+  inputs:
+    summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/*.cobertura.xml'
+    pathToSources: '$(Build.SourcesDirectory)'
+    failIfCoverageEmpty: true
 
-  - script: |
-      set -e
+# ==========================================
+# PUBLISH API
+# ==========================================
 
-      echo "=========================================="
-      echo " PUBLISH API"
-      echo "=========================================="
+- script: |
+    set -e
 
-      dotnet publish "$(API_PROJECT)" \
-        --configuration Release \
-        --no-build \
-        --no-restore \
-        --output "$(Build.ArtifactStagingDirectory)/publish"
+    echo "=========================================="
+    echo " PUBLISH API"
+    echo "=========================================="
 
-      echo ""
-      echo "Published files:"
-      find "$(Build.ArtifactStagingDirectory)/publish" -type f -print
+    dotnet publish "$(API_PROJECT)" \
+      --configuration Release \
+      --no-build \
+      --no-restore \
+      --output "$(Build.ArtifactStagingDirectory)/publish"
 
-    displayName: Publish API
+    echo ""
+    echo "Published files:"
+    find "$(Build.ArtifactStagingDirectory)/publish" -type f -print
+
+  displayName: Publish API
+
+# ==========================================
+# DEPLOY API TO AZURE
+# ==========================================
+
+- task: AzureWebApp@1
+  displayName: Deploy API to Azure App Service
+  inputs:
+    azureSubscription: 'Azure-SecureToolKitAPI'
+    appType: 'webApp'
+    appName: 'securetoolkitapi'
+    package: '$(Build.ArtifactStagingDirectory)/publish'
