@@ -1,3 +1,4 @@
+using Azure.Core;
 using Azure.Identity;
 using SecureToolKitAPI.Application;
 using SecureToolKitAPI.ExceptionHandling;
@@ -7,10 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 var environmentNameFromConfig = builder.Configuration["EnvironmentName"];
 
 var keyVaultUri = builder.Configuration["KeyVaultUri"];
-if (!string.IsNullOrWhiteSpace(keyVaultUri) && !builder.Environment.IsEnvironment("Testing"))
-{
-    builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
-}
+Program.ConfigureKeyVault(builder.Configuration, builder.Environment, keyVaultUri);
 
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -79,3 +77,26 @@ app.MapHealthChecks("/health");
 app.MapHealthChecks("/healthcheck");
 app.MapControllers();
 app.Run();
+
+public partial class Program
+{
+    public static bool ShouldUseKeyVault(IHostEnvironment environment, string? keyVaultUri) =>
+        !string.IsNullOrWhiteSpace(keyVaultUri) && !environment.IsEnvironment("Testing");
+
+    public static void ConfigureKeyVault(
+        IConfigurationBuilder configurationBuilder,
+        IHostEnvironment environment,
+        string? keyVaultUri,
+        TokenCredential? credential = null,
+        Action<IConfigurationBuilder, Uri, TokenCredential?>? configureKeyVault = null)
+    {
+        if (!ShouldUseKeyVault(environment, keyVaultUri))
+        {
+            return;
+        }
+
+        var vaultUri = new Uri(keyVaultUri!);
+        var effectiveConfigurer = configureKeyVault ?? ((builder, uri, token) => builder.AddAzureKeyVault(uri, token ?? new DefaultAzureCredential()));
+        effectiveConfigurer(configurationBuilder, vaultUri, credential);
+    }
+}
