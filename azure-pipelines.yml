@@ -1,4 +1,3 @@
-
 trigger:
 - main
 
@@ -26,6 +25,7 @@ steps:
     echo "=========================================="
     dotnet --info
     echo ""
+
     if [ -f "$(Build.SourcesDirectory)/global.json" ]; then
       echo "global.json:"
       cat "$(Build.SourcesDirectory)/global.json"
@@ -185,3 +185,26 @@ steps:
     summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/*.cobertura.xml'
     pathToSources: '$(Build.SourcesDirectory)'
     failIfCoverageEmpty: true
+
+# ==========================================
+# PUBLISH API
+# ==========================================
+
+- script: |
+    set -e
+
+    echo "=========================================="
+    echo " PUBLISH API"
+    echo "=========================================="
+
+    dotnet publish "$(API_PROJECT)" \
+      --configuration Release \
+      --no-build \
+      --no-restore \
+      --output "$(Build.ArtifactStagingDirectory)/publish"
+
+    echo ""
+    echo "Published files:"
+    find "$(Build.ArtifactStagingDirectory)/publish" -type f -print
+
+  displayName: Publish API
