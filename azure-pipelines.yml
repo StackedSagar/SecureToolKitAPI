@@ -10,6 +10,12 @@ variables:
   TEST_RESULTS: '$(Agent.TempDirectory)/TestResults'
   MIN_LINE_COVERAGE: '80'
 
+  # Azure Container Registry
+  ACR_NAME: 'cloudlearning'
+  ACR_LOGIN_SERVER: 'cloudlearning.azurecr.io'
+  IMAGE_NAME: 'securetoolkitapi'
+  IMAGE_TAG: '$(Build.BuildId)'
+
 stages:
 
 # ============================================================
@@ -17,12 +23,12 @@ stages:
 # ============================================================
 
 - stage: Build
-  displayName: Build, Test and Package
+  displayName: Build, Test and Docker Image
 
   jobs:
 
   - job: Build
-    displayName: Build and Test
+    displayName: Build, Test and Docker Image
 
     steps:
 
@@ -188,14 +194,6 @@ stages:
           exit 1
         fi
 
-        echo ""
-        echo "Coverage report:"
-        echo "$FILE"
-
-        echo ""
-        echo "Required line coverage:"
-        echo "$(MIN_LINE_COVERAGE)%"
-
         LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$FILE" \
           | head -n 1 \
           | cut -d'"' -f2)
@@ -212,20 +210,13 @@ stages:
         echo " COVERAGE RESULT"
         echo "=========================================="
 
-        echo "Line coverage: $COVERAGE%"
-
-        echo ""
-        echo "=========================================="
-        echo " QUALITY GATE"
-        echo "=========================================="
+        echo "Required coverage : $(MIN_LINE_COVERAGE)%"
+        echo "Actual coverage   : $COVERAGE%"
 
         awk \
           -v actual="$COVERAGE" \
           -v minimum="$(MIN_LINE_COVERAGE)" \
           'BEGIN {
-            printf "Required coverage : %.2f%%\n", minimum
-            printf "Actual coverage   : %.2f%%\n", actual
-
             if (actual >= minimum) {
               print ""
               print "QUALITY GATE: PASSED"
@@ -236,10 +227,6 @@ stages:
             print ""
             print "QUALITY GATE: FAILED"
             printf "Coverage %.2f%% < %.2f%%\n", actual, minimum
-
-            print ""
-            print "Pipeline failed because coverage is below the required threshold."
-
             exit 1
           }'
 
@@ -257,41 +244,71 @@ stages:
         pathToSources: '$(Build.SourcesDirectory)'
         failIfCoverageEmpty: true
 
-    # --------------------------------------------------------
-    # Publish API
-    # --------------------------------------------------------
+    # ========================================================
+    # DOCKER BUILD
+    # ========================================================
 
     - script: |
         set -e
 
         echo "=========================================="
-        echo " PUBLISH API"
+        echo " DOCKER BUILD"
         echo "=========================================="
 
-        dotnet publish "$(API_PROJECT)" \
-          --configuration Release \
-          --no-build \
-          --no-restore \
-          --output "$(Build.ArtifactStagingDirectory)/publish"
+        echo "Docker version:"
+        docker --version
 
         echo ""
-        echo "Published files:"
+        echo "Building:"
+        echo "$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)"
 
-        find "$(Build.ArtifactStagingDirectory)/publish" \
-          -type f \
-          -print
+        docker build \
+          --file "$(Build.SourcesDirectory)/Dockerfile" \
+          --tag "$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)" \
+          "$(Build.SourcesDirectory)"
 
-      displayName: Publish API
+      displayName: Build Docker image
 
-    # --------------------------------------------------------
-    # Publish Pipeline Artifact
-    # --------------------------------------------------------
+    # ========================================================
+    # LOGIN TO AZURE
+    # ========================================================
 
-    - task: PublishPipelineArtifact@1
-      displayName: Publish API artifact
+    - task: AzureCLI@2
+      displayName: Login to Azure Container Registry
       inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/publish'
-        artifact: 'SecureToolKitAPI'
+        azureSubscription: 'Azure-SecureToolKitAPI'
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -e
+
+          echo "=========================================="
+          echo " ACR LOGIN"
+          echo "=========================================="
+
+          az account show
+
+          az acr login \
+            --name "$(ACR_NAME)"
+
+    # ========================================================
+    # PUSH DOCKER IMAGE
+    # ========================================================
+
+    - script: |
+        set -e
+
+        echo "=========================================="
+        echo " PUSH DOCKER IMAGE"
+        echo "=========================================="
+
+        docker push "$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)"
+
+        echo ""
+        echo "Docker image pushed successfully:"
+        echo "$(ACR_LOGIN_SERVER)/$(IMAGE_NAME):$(IMAGE_TAG)"
+
+      displayName: Push Docker image to ACR
 
 
 # ============================================================
@@ -299,18 +316,14 @@ stages:
 # ============================================================
 
 - stage: Deploy
-  displayName: Deploy to Production
+  displayName: Deploy Container to Production
   dependsOn: Build
   condition: succeeded()
 
   jobs:
 
-  # IMPORTANT:
-  # This is a deployment job, not a normal job.
-  # It connects this deployment to the Production environment.
-
   - deployment: Deploy
-    displayName: Deploy API to Production
+    displayName: Deploy API Container to Production
     environment: Production
 
     strategy:
@@ -321,24 +334,12 @@ stages:
           steps:
 
           # --------------------------------------------------
-          # Download Artifact
+          # Deploy Docker image to App Service
           # --------------------------------------------------
 
-          - task: DownloadPipelineArtifact@2
-            displayName: Download API artifact
-            inputs:
-              buildType: 'current'
-              artifactName: 'SecureToolKitAPI'
-              targetPath: '$(Pipeline.Workspace)/SecureToolKitAPI'
-
-          # --------------------------------------------------
-          # Deploy to Azure App Service
-          # --------------------------------------------------
-
-          - task: AzureWebApp@1
-            displayName: Deploy API to Azure App Service
+          - task: AzureWebAppContainer@1
+            displayName: Deploy Docker image to Azure App Service
             inputs:
               azureSubscription: 'Azure-SecureToolKitAPI'
-              appType: 'webApp'
               appName: 'securetoolkitapi'
-              package: '$(Pipeline.Workspace)/SecureToolKitAPI'
+              containers: 'cloudlearning.azurecr.io/securetoolkitapi:$(Build.BuildId)'
