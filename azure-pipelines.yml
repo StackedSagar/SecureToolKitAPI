@@ -214,6 +214,14 @@ steps:
 
   displayName: Publish API
 
+
+  
+- task: PublishPipelineArtifact@1
+  displayName: Publish API artifact
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)/publish'
+    artifact: 'SecureToolKitAPI'
+
 # ==========================================
 # DEPLOY API TO AZURE
 # ==========================================
