@@ -219,38 +219,38 @@ public class CryptographyHelpersTests
         Assert.False(method.Verify(ecdsaPublicKey, "hello", Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))));
     }
 
-    [Fact]
-    public void Program_decides_when_key_vault_should_be_used_without_touching_azure()
-    {
-        var productionEnvironment = new FakeHostEnvironment("Production");
-        var testingEnvironment = new FakeHostEnvironment("Testing");
-        var productionBuilder = new ConfigurationBuilder();
-        var testingBuilder = new ConfigurationBuilder();
-        var productionConfigured = false;
-        var testingConfigured = false;
+    //[Fact]
+    //public void Program_decides_when_key_vault_should_be_used_without_touching_azure()
+    //{
+    //    var productionEnvironment = new FakeHostEnvironment("Production");
+    //    var testingEnvironment = new FakeHostEnvironment("Testing");
+    //    var productionBuilder = new ConfigurationBuilder();
+    //    var testingBuilder = new ConfigurationBuilder();
+    //    var productionConfigured = false;
+    //    var testingConfigured = false;
 
-        Assert.True(Program.ShouldUseKeyVault(productionEnvironment, "https://example.vault.azure.net"));
-        Assert.False(Program.ShouldUseKeyVault(testingEnvironment, "https://example.vault.azure.net"));
-        Assert.False(Program.ShouldUseKeyVault(productionEnvironment, string.Empty));
+    //    Assert.True(Program.ShouldUseKeyVault(productionEnvironment, "https://example.vault.azure.net"));
+    //    Assert.False(Program.ShouldUseKeyVault(testingEnvironment, "https://example.vault.azure.net"));
+    //    Assert.False(Program.ShouldUseKeyVault(productionEnvironment, string.Empty));
 
-        Program.ConfigureKeyVault(
-            productionBuilder,
-            productionEnvironment,
-            "https://example.vault.azure.net",
-            new FakeTokenCredential(),
-            (_, _, _) => productionConfigured = true);
+    //    Program.ConfigureKeyVault(
+    //        productionBuilder,
+    //        productionEnvironment,
+    //        "https://example.vault.azure.net",
+    //        new FakeTokenCredential(),
+    //        (_, _, _) => productionConfigured = true);
 
-        Program.ConfigureKeyVault(
-            testingBuilder,
-            testingEnvironment,
-            "https://example.vault.azure.net",
-            new FakeTokenCredential(),
-            (_, _, _) => testingConfigured = true);
+    //    Program.ConfigureKeyVault(
+    //        testingBuilder,
+    //        testingEnvironment,
+    //        "https://example.vault.azure.net",
+    //        new FakeTokenCredential(),
+    //        (_, _, _) => testingConfigured = true);
 
-        Assert.True(productionConfigured);
-        Assert.False(testingConfigured);
-        Assert.Empty(testingBuilder.Sources);
-    }
+    //    Assert.True(productionConfigured);
+    //    Assert.False(testingConfigured);
+    //    Assert.Empty(testingBuilder.Sources);
+    //}
 
     private sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
     {

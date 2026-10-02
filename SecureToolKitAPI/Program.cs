@@ -1,5 +1,5 @@
-using Azure.Core;
-using Azure.Identity;
+//using Azure.Core;
+//using Azure.Identity;
 using SecureToolKitAPI.Application;
 using SecureToolKitAPI.ExceptionHandling;
 
@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 var environmentNameFromConfig = builder.Configuration["EnvironmentName"];
 
 var keyVaultUri = builder.Configuration["KeyVaultUri"];
-Program.ConfigureKeyVault(builder.Configuration, builder.Environment, keyVaultUri);
+//Program.ConfigureKeyVault(builder.Configuration, builder.Environment, keyVaultUri);
 
 builder.Host.UseDefaultServiceProvider(options =>
 {
@@ -62,41 +62,42 @@ app.MapGet("/ConfigEnvironment", () =>
     };
 });
 
-app.MapGet("/KeyVaultTest", (IConfiguration configuration) =>
-{
-    var value = configuration["LearningSecret"];
-
-    return Results.Ok(new
-    {
-        Source = "Azure Key Vault",
-        Value = value
-    });
-});
+//app.MapGet("/KeyVaultTest", (IConfiguration configuration) =>
+//{
+//    var value = configuration["LearningSecret"];
+//    return Results.Ok(new
+//    {
+//        Source = "Azure Key Vault",
+//        Value = value
+//    });
+//});
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/healthcheck");
 app.MapControllers();
 app.Run();
 
-public partial class Program
-{
-    public static bool ShouldUseKeyVault(IHostEnvironment environment, string? keyVaultUri) =>
-        !string.IsNullOrWhiteSpace(keyVaultUri) && !environment.IsEnvironment("Testing");
 
-    public static void ConfigureKeyVault(
-        IConfigurationBuilder configurationBuilder,
-        IHostEnvironment environment,
-        string? keyVaultUri,
-        TokenCredential? credential = null,
-        Action<IConfigurationBuilder, Uri, TokenCredential?>? configureKeyVault = null)
-    {
-        if (!ShouldUseKeyVault(environment, keyVaultUri))
-        {
-            return;
-        }
+//Commenting  Azure Key Vault as its no longer working
+//public partial class Program
+//{
+//    //public static bool ShouldUseKeyVault(IHostEnvironment environment, string? keyVaultUri) =>
+//    //    !string.IsNullOrWhiteSpace(keyVaultUri) && !environment.IsEnvironment("Testing");
 
-        var vaultUri = new Uri(keyVaultUri!);
-        var effectiveConfigurer = configureKeyVault ?? ((builder, uri, token) => builder.AddAzureKeyVault(uri, token ?? new DefaultAzureCredential()));
-        effectiveConfigurer(configurationBuilder, vaultUri, credential);
-    }
-}
+//    //public static void ConfigureKeyVault(
+//    //    IConfigurationBuilder configurationBuilder,
+//    //    IHostEnvironment environment,
+//    //    string? keyVaultUri,
+//    //    TokenCredential? credential = null,
+//    //    Action<IConfigurationBuilder, Uri, TokenCredential?>? configureKeyVault = null)
+//    //{
+//    //    if (!ShouldUseKeyVault(environment, keyVaultUri))
+//    //    {
+//    //        return;
+//    //    }
+
+//    //    var vaultUri = new Uri(keyVaultUri!);
+//    //    var effectiveConfigurer = configureKeyVault ?? ((builder, uri, token) => builder.AddAzureKeyVault(uri, token ?? new DefaultAzureCredential()));
+//    //    effectiveConfigurer(configurationBuilder, vaultUri, credential);
+//    }
+//}
