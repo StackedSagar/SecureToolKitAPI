@@ -311,35 +311,35 @@ stages:
       displayName: Push Docker image to ACR
 
 
-# ============================================================
-# DEPLOY STAGE
-# ============================================================
+# # ============================================================
+# # DEPLOY STAGE
+# # ============================================================
 
-- stage: Deploy
-  displayName: Deploy Container to Production
-  dependsOn: Build
-  condition: succeeded()
+# - stage: Deploy
+#   displayName: Deploy Container to Production
+#   dependsOn: Build
+#   condition: succeeded()
 
-  jobs:
+#   jobs:
 
-  - deployment: Deploy
-    displayName: Deploy API Container to Production
-    environment: Production
+#   - deployment: Deploy
+#     displayName: Deploy API Container to Production
+#     environment: Production
 
-    strategy:
-      runOnce:
+#     strategy:
+#       runOnce:
 
-        deploy:
+#         deploy:
 
-          steps:
+#           steps:
 
-          # --------------------------------------------------
-          # Deploy Docker image to App Service
-          # --------------------------------------------------
+#           # --------------------------------------------------
+#           # Deploy Docker image to App Service
+#           # --------------------------------------------------
 
-          - task: AzureWebAppContainer@1
-            displayName: Deploy Docker image to Azure App Service
-            inputs:
-              azureSubscription: 'Azure-SecureToolKitAPI'
-              appName: 'securetoolkitapi'
-              containers: 'cloudlearning.azurecr.io/securetoolkitapi:$(Build.BuildId)'
+#           - task: AzureWebAppContainer@1
+#             displayName: Deploy Docker image to Azure App Service
+#             inputs:
+#               azureSubscription: 'Azure-SecureToolKitAPI'
+#               appName: 'securetoolkitapi'
+#               containers: 'cloudlearning.azurecr.io/securetoolkitapi:$(Build.BuildId)'
